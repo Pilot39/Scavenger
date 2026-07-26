@@ -47,12 +47,15 @@ export function AddressDisplay({ address, chars = 4, showExplorer = false, class
         onClick={copy}
         title="Copy address"
         aria-label="Copy address"
-        className="text-muted-foreground hover:text-foreground transition-colors"
+        className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {copied
           ? <Check className="h-3 w-3 text-green-500" />
           : <Copy className="h-3 w-3" />}
       </button>
+      <span role="status" aria-live="polite" className="sr-only">
+        {copied ? 'Address copied to clipboard.' : ''}
+      </span>
 
       {showExplorer && EXPLORER_ROOTS[config.network] && (
         <a
@@ -61,7 +64,7 @@ export function AddressDisplay({ address, chars = 4, showExplorer = false, class
           rel="noreferrer"
           title="View on Stellar Expert"
           aria-label="View on Stellar Expert"
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <ExternalLink className="h-3 w-3" />
         </a>

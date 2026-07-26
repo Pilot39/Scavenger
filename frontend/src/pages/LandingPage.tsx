@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Recycle, Truck, Factory, Github, Twitter } from 'lucide-react'
+import { Recycle, Truck, Factory } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { useSupplyChainStats } from '@/hooks/useSupplyChainStats'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { useStats } from '@/hooks/useStats'
 import { useAppTitle } from '@/hooks/useAppTitle'
 
 const STEPS = [
@@ -23,25 +24,28 @@ const STEPS = [
 ]
 
 const FOOTER_LINKS = [
-  { label: 'GitHub', href: 'https://github.com', icon: Github },
-  { label: 'Twitter', href: 'https://twitter.com', icon: Twitter },
+  { label: 'GitHub', href: 'https://github.com' },
+  { label: 'Twitter', href: 'https://twitter.com' },
 ]
 
 export function LandingPage() {
   useAppTitle('Scavngr — Decentralized Recycling')
-  const { totalWastes, totalWeight, totalTokens, isLoading } = useSupplyChainStats()
+  const { totalWastes, totalWeight, totalTokens, isLoading } = useStats()
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* Nav */}
       <header className="flex h-14 items-center justify-between border-b px-6">
         <div className="flex items-center gap-2 font-bold">
-          <Recycle className="h-5 w-5 text-primary" />
+          <Recycle className="h-5 w-5 text-primary" aria-hidden="true" />
           Scavngr
         </div>
-        <Button asChild size="sm">
-          <Link to="/dashboard">Launch App</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button asChild size="sm">
+            <Link to="/dashboard">Launch App</Link>
+          </Button>
+        </div>
       </header>
 
       <main className="flex-1">
@@ -74,7 +78,7 @@ export function LandingPage() {
               {STEPS.map((step, i) => (
                 <div key={step.title} className="flex flex-col items-center gap-3 text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                    <step.icon className="h-7 w-7 text-primary" />
+                    <step.icon className="h-7 w-7 text-primary" aria-hidden="true" />
                   </div>
                   <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Step {i + 1}
@@ -114,19 +118,18 @@ export function LandingPage() {
       <footer className="border-t px-6 py-8">
         <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <Recycle className="h-4 w-4 text-primary" />
+            <Recycle className="h-4 w-4 text-primary" aria-hidden="true" />
             Scavngr
           </div>
           <div className="flex gap-4">
-            {FOOTER_LINKS.map(({ label, href, icon: Icon }) => (
+            {FOOTER_LINKS.map(({ label, href }) => (
               <a
                 key={label}
                 href={href}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="flex min-h-11 items-center gap-1.5 px-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                <Icon className="h-4 w-4" />
                 {label}
               </a>
             ))}
