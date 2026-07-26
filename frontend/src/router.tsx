@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { AppShell } from '@/components/layout/AppShell'
 import { PageSkeleton } from '@/components/ui/Skeletons'
-import { PageErrorBoundary } from '@/components/PageErrorBoundary'
+import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 
 // Eagerly load tiny pages that are always needed at startup
 import { LandingPage } from '@/pages/LandingPage'
@@ -191,73 +191,79 @@ function ProtectedLayout() {
   if (isLoading) return null
   return isAuthenticated ? (
     <AppShell>
-      <PageErrorBoundary>
-        <PageFallback />
-      </PageErrorBoundary>
+      <PageFallback />
     </AppShell>
   ) : (
     <Navigate to="/login" replace />
   )
 }
 
+// Each protected page gets its own `errorElement` so a crash on one route
+// renders a fallback in place of just that page — the app shell and every
+// other route stay unaffected, and navigating away recovers automatically.
+const PROTECTED_ROUTES = [
+  { path: 'dashboard', element: <HomePage /> },
+  { path: 'submit', element: <div>Submit Waste</div> },
+  { path: 'collect', element: <CollectorDashboardPage /> },
+  { path: 'incentives', element: <IncentivesMarketplacePage /> },
+  { path: 'incentives/manage', element: <IncentivesPage /> },
+  { path: 'transfer', element: <MaterialTransferPage /> },
+  { path: 'history', element: <div>History</div> },
+  { path: 'dashboard/recycler', element: <RecyclerDashboard /> },
+  { path: 'wastes', element: <WasteListPage /> },
+  { path: 'manufacturer', element: <ManufacturerDashboardPage /> },
+  { path: 'settings', element: <SettingsPage /> },
+  { path: 'settings/offline', element: <OfflineSettings /> },
+  { path: 'rewards', element: <RewardsPage /> },
+  { path: 'tracker', element: <SupplyChainTrackerPage /> },
+  { path: 'community', element: <CommunityPage /> },
+  { path: 'governance', element: <GovernancePage /> },
+  { path: 'analytics', element: <AnalyticsPage /> },
+  { path: 'map', element: <WasteMapPage /> },
+  { path: 'admin', element: <AdminDashboardPage /> },
+  { path: 'verify', element: <VerificationPage /> },
+  { path: 'route-planner', element: <RoutePlannerPage /> },
+  { path: 'messages', element: <MessagingPage /> },
+  { path: 'compare', element: <WasteComparisonPage /> },
+  { path: 'predictions', element: <PredictiveAnalyticsPage /> },
+  { path: 'marketplace', element: <WasteMarketplacePage /> },
+  { path: 'certifications', element: <WasteCertificationPage /> },
+  { path: 'recycling-guide', element: <RecyclingGuidePage /> },
+  { path: 'performance', element: <PerformanceMonitoringPage /> },
+  { path: 'achievements', element: <GamificationPage /> },
+  { path: 'offline', element: <OfflinePage /> },
+  { path: 'waste-history', element: <WasteHistoryPage /> },
+  { path: 'participant-search', element: <ParticipantSearchPage /> },
+  { path: 'waste-statistics', element: <WasteStatisticsPage /> },
+  { path: 'reward-tracking', element: <RewardTrackingPage /> },
+  { path: 'verification-dashboard', element: <WasteVerificationDashboardPage /> },
+  { path: 'register', element: <ParticipantRegistrationPage /> },
+  { path: 'test-reports', element: <TestReportsPage /> },
+  { path: 'compliance-reports', element: <ComplianceReportsPage /> },
+  { path: 'notifications', element: <NotificationCenterPage /> },
+  { path: 'batch-upload', element: <BatchUploadPage /> },
+  { path: 'feature-flags', element: <FeatureFlagsPage /> },
+  { path: 'health', element: <PlatformHealthDashboardPage /> },
+  { path: 'slas', element: <PerformanceSLAsPage /> },
+  // Previously unrouted pages — wired up with lazy loading
+  { path: 'profile', element: <ProfilePage /> },
+  { path: 'donations', element: <CharityDonationsPage /> },
+  { path: 'environmental-impact', element: <EnvironmentalImpactDashboardPage /> },
+  { path: 'impact-calculator', element: <ImpactCalculatorPage /> },
+  { path: 'search', element: <SearchResultsPage /> },
+  { path: 'subscriptions', element: <SubscriptionsPage /> },
+  { path: 'qr', element: <QRCodePage /> },
+]
+
 export const router = createBrowserRouter([
-  { path: '/', element: <LandingPage /> },
-  { path: '/login', element: <LoginPage /> },
+  { path: '/', element: <LandingPage />, errorElement: <RouteErrorBoundary /> },
+  { path: '/login', element: <LoginPage />, errorElement: <RouteErrorBoundary /> },
   {
     element: <ProtectedLayout />,
-    children: [
-      { path: 'dashboard', element: <HomePage /> },
-      { path: 'submit', element: <div>Submit Waste</div> },
-      { path: 'collect', element: <CollectorDashboardPage /> },
-      { path: 'incentives', element: <IncentivesMarketplacePage /> },
-      { path: 'incentives/manage', element: <IncentivesPage /> },
-      { path: 'transfer', element: <MaterialTransferPage /> },
-      { path: 'history', element: <div>History</div> },
-      { path: 'dashboard/recycler', element: <RecyclerDashboard /> },
-      { path: 'wastes', element: <WasteListPage /> },
-      { path: 'manufacturer', element: <ManufacturerDashboardPage /> },
-      { path: 'settings', element: <SettingsPage /> },
-      { path: 'settings/offline', element: <OfflineSettings /> },
-      { path: 'rewards', element: <RewardsPage /> },
-      { path: 'tracker', element: <SupplyChainTrackerPage /> },
-      { path: 'community', element: <CommunityPage /> },
-      { path: 'governance', element: <GovernancePage /> },
-      { path: 'analytics', element: <AnalyticsPage /> },
-      { path: 'map', element: <WasteMapPage /> },
-      { path: 'admin', element: <AdminDashboardPage /> },
-      { path: 'verify', element: <VerificationPage /> },
-      { path: 'route-planner', element: <RoutePlannerPage /> },
-      { path: 'messages', element: <MessagingPage /> },
-      { path: 'compare', element: <WasteComparisonPage /> },
-      { path: 'predictions', element: <PredictiveAnalyticsPage /> },
-      { path: 'marketplace', element: <WasteMarketplacePage /> },
-      { path: 'certifications', element: <WasteCertificationPage /> },
-      { path: 'recycling-guide', element: <RecyclingGuidePage /> },
-      { path: 'performance', element: <PerformanceMonitoringPage /> },
-      { path: 'achievements', element: <GamificationPage /> },
-      { path: 'offline', element: <OfflinePage /> },
-      { path: 'waste-history', element: <WasteHistoryPage /> },
-      { path: 'participant-search', element: <ParticipantSearchPage /> },
-      { path: 'waste-statistics', element: <WasteStatisticsPage /> },
-      { path: 'reward-tracking', element: <RewardTrackingPage /> },
-      { path: 'verification-dashboard', element: <WasteVerificationDashboardPage /> },
-      { path: 'register', element: <ParticipantRegistrationPage /> },
-      { path: 'test-reports', element: <TestReportsPage /> },
-      { path: 'compliance-reports', element: <ComplianceReportsPage /> },
-      { path: 'notifications', element: <NotificationCenterPage /> },
-      { path: 'batch-upload', element: <BatchUploadPage /> },
-      { path: 'feature-flags', element: <FeatureFlagsPage /> },
-      { path: 'health', element: <PlatformHealthDashboardPage /> },
-      { path: 'slas', element: <PerformanceSLAsPage /> },
-      // Previously unrouted pages — wired up with lazy loading
-      { path: 'profile', element: <ProfilePage /> },
-      { path: 'donations', element: <CharityDonationsPage /> },
-      { path: 'environmental-impact', element: <EnvironmentalImpactDashboardPage /> },
-      { path: 'impact-calculator', element: <ImpactCalculatorPage /> },
-      { path: 'search', element: <SearchResultsPage /> },
-      { path: 'subscriptions', element: <SubscriptionsPage /> },
-      { path: 'qr', element: <QRCodePage /> },
-    ],
+    children: PROTECTED_ROUTES.map((route) => ({
+      ...route,
+      errorElement: <RouteErrorBoundary />,
+    })),
   },
   { path: '*', element: <NotFoundPage /> },
 ])
