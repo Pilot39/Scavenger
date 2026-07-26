@@ -7,7 +7,7 @@ use crate::services::audit::{
     AuditAction, AuditEntry, AuditEventType, AuditQuery, AuditReport, AuditService,
     AlertRule, RetentionPolicy,
 };
-use crate::validation::{validate_pagination, ValidationError};
+use crate::validation::{error_response, validate_pagination, ValidationError};
 
 #[derive(Debug, Deserialize)]
 pub struct AuditLogQueryParams {
@@ -46,16 +46,6 @@ pub struct RetentionPolicyRequest {
     pub archive_enabled: bool,
 }
 
-fn error_response(errors: Vec<ValidationError>) -> HttpResponse {
-    HttpResponse::BadRequest().json(ApiBuilder::error_response::<String>(
-        errors
-            .iter()
-            .map(|e| format!("{}: {}", e.field, e.message))
-            .collect::<Vec<_>>()
-            .join("; "),
-    ))
-}
-
 pub async fn list_audit_logs(
     audit: web::Data<AuditService>,
     query: web::Query<AuditLogQueryParams>,
@@ -65,7 +55,7 @@ pub async fn list_audit_logs(
 
     let errors = validate_pagination(page, limit);
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
     let audit_query = AuditQuery {

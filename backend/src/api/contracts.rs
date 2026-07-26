@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::cache::Cache;
 use crate::services::api::{ApiBuilder, PaginatedResponse};
-use crate::validation::{validate_pagination, ValidationError};
+use crate::validation::{error_response, validate_pagination, ValidationError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasteResponse {
@@ -70,16 +70,6 @@ fn now() -> String {
     Utc::now().to_rfc3339()
 }
 
-fn error_response(errors: Vec<ValidationError>) -> HttpResponse {
-    HttpResponse::BadRequest().json(ApiBuilder::error_response::<String>(
-        errors
-            .iter()
-            .map(|e| format!("{}: {}", e.field, e.message))
-            .collect::<Vec<_>>()
-            .join("; "),
-    ))
-}
-
 fn query_string(req: &HttpRequest) -> String {
     let qs = req.query_string();
     if qs.is_empty() {
@@ -99,7 +89,7 @@ pub async fn list_wastes(
 
     let errors = validate_pagination(page, limit);
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
     let cache_key = format!("contract:wastes:{}", query_string(&req));
@@ -228,7 +218,7 @@ pub async fn list_participants(
 
     let errors = validate_pagination(page, limit);
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
     let cache_key = format!("contract:participants:{}", query_string(&req));

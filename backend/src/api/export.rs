@@ -7,7 +7,8 @@ use crate::services::api::{ApiBuilder, PaginatedResponse};
 use crate::services::email::{EmailService, TransactionalEmail};
 use crate::services::export::ExportService;
 use crate::validation::{
-    validate_date_range, validate_export_format, validate_pagination, ValidationError,
+    error_response, validate_date_range, validate_export_format, validate_pagination,
+    ValidationError,
 };
 use std::sync::Arc;
 
@@ -71,16 +72,6 @@ pub struct EmailExportRequest {
     pub message: Option<String>,
 }
 
-fn error_response(errors: Vec<ValidationError>) -> HttpResponse {
-    HttpResponse::BadRequest().json(ApiBuilder::error_response::<String>(
-        errors
-            .iter()
-            .map(|e| format!("{}: {}", e.field, e.message))
-            .collect::<Vec<_>>()
-            .join("; "),
-    ))
-}
-
 pub async fn export_data(
     cache: web::Data<Cache>,
     body: web::Json<ExportRequest>,
@@ -101,7 +92,7 @@ pub async fn export_data(
     }
 
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
     let export_id = uuid::Uuid::new_v4().to_string();
@@ -183,7 +174,7 @@ pub async fn list_exports(
 
     let errors = validate_pagination(page, limit);
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
     let items: Vec<ExportHistoryEntry> = Vec::new();
@@ -210,7 +201,7 @@ pub async fn send_export_email(
     }
 
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
     let subject = body
@@ -274,7 +265,7 @@ pub async fn create_scheduled_export(
     }
 
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
     let config = ScheduledExportConfig {

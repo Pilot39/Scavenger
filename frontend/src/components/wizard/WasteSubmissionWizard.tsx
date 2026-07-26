@@ -1,13 +1,23 @@
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { Card } from '../ui/Card'
-import { Button } from '../ui/Button'
-import { WasteTypeStep } from './steps/WasteTypeStep'
-import { WasteDetailsStep } from './steps/WasteDetailsStep'
-import { LocationStep } from './steps/LocationStep'
-import { ReviewStep } from './steps/ReviewStep'
-import { ProgressIndicator } from './ProgressIndicator'
-import { WasteSubmissionFormData } from './types'
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { WasteTypeStep } from './steps/WasteTypeStep';
+import { WasteDetailsStep } from './steps/WasteDetailsStep';
+import { LocationStep } from './steps/LocationStep';
+import { ReviewStep } from './steps/ReviewStep';
+import { ProgressIndicator } from './ProgressIndicator';
+import { WasteType } from '@/api/types';
+import { wasteSubmissionSchema } from '@/lib/validation/wasteSubmission';
+
+interface WasteSubmissionFormData {
+  wasteType: WasteType | '';
+  weight: string;
+  latitude: string;
+  longitude: string;
+  notes: string;
+}
 
 const STEPS = [
   { id: 1, title: 'Waste Type' },
@@ -19,9 +29,10 @@ const STEPS = [
 export function WasteSubmissionWizard({ onComplete, onCancel }: { onComplete: (data: WasteSubmissionFormData) => void; onCancel: () => void }) {
   const [currentStep, setCurrentStep] = useState(1);
   const { register, handleSubmit, watch, setValue, trigger, formState: { errors } } = useForm<WasteSubmissionFormData>({
+    resolver: zodResolver(wasteSubmissionSchema('grams')),
     defaultValues: {
       wasteType: WasteType.Paper,
-      weight: 0,
+      weight: '',
       latitude: '',
       longitude: '',
       notes: '',

@@ -71,7 +71,6 @@ export function initWebVitals(
           id: e.id,
         }
         metrics.lcp = lcp
-        if (debug) console.log('LCP:', lcp)
         onMetric?.(lcp)
       })
       lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] })
@@ -95,7 +94,6 @@ export function initWebVitals(
           rating: getRating(clsValue, 'cls'),
         }
         metrics.cls = cls
-        if (debug) console.log('CLS:', cls)
         onMetric?.(cls)
       })
       clsObserver.observe({ entryTypes: ['layout-shift'] })
@@ -115,7 +113,6 @@ export function initWebVitals(
             rating: getRating(fcpEntry.startTime, 'fcp'),
           }
           metrics.fcp = fcp
-          if (debug) console.log('FCP:', fcp)
           onMetric?.(fcp)
         }
       })
@@ -141,7 +138,6 @@ export function initWebVitals(
             rating: getRating(maxINP, 'inp'),
           }
           metrics.inp = inp
-          if (debug) console.log('INP:', inp)
           onMetric?.(inp)
         }
       })
@@ -168,7 +164,6 @@ export function initWebVitals(
         rating: getRating(ttfb, 'ttfb'),
       }
       metrics.ttfb = ttfbMetric
-      if (debug) console.log('TTFB:', ttfbMetric)
       onMetric?.(ttfbMetric)
     }
   }
