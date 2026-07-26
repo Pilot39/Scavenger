@@ -7,6 +7,7 @@ mod security;
 mod validation;
 mod search;
 mod errors;
+mod rpc;
 
 use actix_web::{web, App, HttpServer, HttpResponse, HttpRequest, ResponseError};
 use actix_cors::Cors;
@@ -16,9 +17,12 @@ use services::{
     WebhookManager, ExportService, AuditService, VerificationService, DefaultVerificationService,
     ArchivalService, FileSystemArchivalStorage,
 };
+// Removed unused imports: RecommendationEngine, NFTManager, ChainAbstraction (#906)
 use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware, RequestIdMiddleware};
-use cache::Cache;
+use cache::{Cache, CacheInvalidationManager};
+use rpc::{StellarRpcClient, StellarRpcConfig};
 use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api, archival as archival_api};
+// analytics API removed — legacy unregistered routes cleaned up (#906)
 use errors::AppError;
 use std::sync::Arc;
 use tracing::info;
@@ -68,12 +72,25 @@ async fn main() -> std::io::Result<()> {
     let webhook_manager = Arc::new(WebhookManager::new());
     let rate_limit_config = RateLimitConfig::default();
     let cache = Cache::new(300);
+    let cache_invalidation = Arc::new(CacheInvalidationManager::new());
     let audit_service = AuditService::new();
     let ws_manager = ws::WsConnectionManager::new();
     let verification_service: Arc<dyn VerificationService> = Arc::new(DefaultVerificationService::new());
     let csrf_secret = std::env::var("CSRF_SECRET").unwrap_or_else(|_| "change-me-in-production".to_string());
     let allowed_origins = std::env::var("ALLOWED_ORIGINS")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
+
+    // Initialize Stellar RPC client (#907)
+    let stellar_rpc_config = StellarRpcConfig::from_env();
+    let stellar_client = Arc::new(
+        StellarRpcClient::new(stellar_rpc_config)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?,
+    );
+    info!(
+        horizon = %stellar_client.horizon_url(),
+        contract = %stellar_client.contract_id(),
+        "Stellar RPC client ready"
+    );
     
     // Initialize search client
     let search_config = search::SearchClientConfig {
@@ -133,11 +150,13 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(storage_service.clone()))
             .app_data(web::Data::new(webhook_manager.clone()))
             .app_data(web::Data::new(cache.clone()))
+            .app_data(web::Data::new(cache_invalidation.clone()))
             .app_data(web::Data::new(audit_service.clone()))
             .app_data(web::Data::new(verification_service.clone()))
             .app_data(web::Data::new(ws_manager.clone()))
             .app_data(web::Data::new(search_client.clone()))
             .app_data(web::Data::new(archival_service.clone()))
+            .app_data(web::Data::new(stellar_client.clone()))
             .app_data(web::JsonConfig::default().error_handler(json_error_handler))
             .default_service(web::route().to(not_found))
             // Health
@@ -151,6 +170,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/contracts/info", web::get().to(contracts::get_contract_info))
             .route("/api/v1/cache/invalidate/waste/{id}", web::post().to(contracts::invalidate_waste_cache))
             .route("/api/v1/cache/invalidate/all", web::post().to(contracts::invalidate_all_cache))
+            .route("/api/v1/cache/metrics", web::get().to(contracts::cache_metrics))
             // WebSocket (Task 2)
             .route("/ws", web::get().to(ws::ws_handler))
             .route("/ws/health", web::get().to(ws::ws_health))

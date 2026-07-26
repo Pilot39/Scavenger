@@ -7,6 +7,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 ### Added
+- **Stellar RPC client module** (#907) — Centralised Horizon/Soroban access with retry and exponential backoff
+  - `backend/src/rpc/client.rs` — `StellarRpcClient` with `get_account`, `get_latest_ledger`, `submit_transaction`, `get_ledger_entries`, `simulate_transaction`
+  - `backend/src/rpc/mod.rs` — Module entry point; re-exports all public types
+  - `RetryConfig` with full-jitter exponential backoff, configurable max attempts and delay cap
+  - All Stellar env vars (`STELLAR_HORIZON_URL`, `SOROBAN_RPC_URL`, `CONTRACT_ID`, etc.) read via `StellarRpcConfig::from_env()`
+  - Client registered as `Arc<StellarRpcClient>` app data; handlers can inject it via `web::Data`
+- **Per-endpoint cache TTL configuration** (#908) — Hot reads now expire at the appropriate rate
+  - `backend/src/cache/ttl.rs` — `CacheTtl` enum with named presets: `WasteItem` (30 s), `WasteList` / `ParticipantItem` / `ParticipantList` (60 s), `ContractStats` (2 min), `ContractInfo` (5 min)
+  - `cache_keys` helpers centralise cache key strings to prevent typos
+  - `CacheInvalidationManager` wired as `Arc` app data; `invalidate_waste_cache` and `invalidate_all_cache` now apply structured invalidation strategies
+  - New `GET /api/v1/cache/metrics` endpoint exposes hit/miss/eviction counters and current cache size
+- **Per-route rate limiting** (#909) — Public read-heavy routes now have stricter limits
+  - `RouteRateLimitConfig` — associates a URL path prefix with a `RateLimitTier`
+  - `RateLimitLayer` builder for ergonomic middleware composition
+  - `/api/v1/contracts/` and `/api/v1/search` throttled to Anonymous tier (30 RPM / 200 RPH)
+  - All 429 responses now include `Retry-After` header (seconds until window resets)
+  - Per-route + per-IP sliding window ensures limits are independent across route groups
+
+### Changed
+- **Cache layer** (#908) — `contracts.rs` handlers use `set_with_ttl` with typed `CacheTtl` constants instead of the default TTL
+- **Rate limiting** (#909) — `RateLimitMiddlewareService` requires `S: Clone` (standard actix-web pattern); 429 body is now JSON with `error`, `message`, and `retry_after_seconds` fields
+
+### Removed
+- **Legacy analytics API endpoints** (#906) — `/analytics/participant/{id}`, `/analytics/global`, `/analytics/metrics/{name}` were never registered in `main.rs` and had no consumers; `api/analytics.rs` content cleared and module removed from `api/mod.rs`
+- **Unused service exports** (#906) — `RecommendationEngine`, `NFTManager`, `ChainAbstraction` removed from `services/mod.rs` public re-exports (source files retained for future use)
+
+### Added
 - **Feature Flag System** (#786) — Gradual rollout and A/B testing infrastructure
   - `frontend/src/lib/featureFlags.ts` — Flag definitions, evaluation logic, rollout by user hash, TTL-aware overrides, analytics tracking
   - `frontend/src/hooks/useFeatureFlags.ts` — React hooks (`useFlag`, `useFeatureFlag`, `useFeatureFlags`)
