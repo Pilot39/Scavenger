@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CarbonImpactCard } from '../CarbonImpactCard';
+import { CarbonImpactCard } from './index';
 
 describe('CarbonImpactCard', () => {
   it('should render carbon impact title', () => {

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { Recycle, Users, TrendingUp, Award, Package, AlertTriangle } from 'lucide-react'
-import { StatCard } from './StatCard'
+import { StatCard } from './index'
 
 const meta: Meta<typeof StatCard> = {
   title: 'Design System/StatCard',

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { Package, Search, Inbox, AlertTriangle } from 'lucide-react'
-import { EmptyState } from './EmptyState'
+import { EmptyState } from './index'
 
 const meta: Meta<typeof EmptyState> = {
   title: 'Design System/EmptyState',

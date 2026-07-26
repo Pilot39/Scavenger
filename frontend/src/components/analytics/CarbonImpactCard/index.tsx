@@ -1,5 +1,5 @@
 import { Leaf, TrendingUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/Card';
 
 export function CarbonImpactCard() {
   const carbonData = {

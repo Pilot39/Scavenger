@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import VerificationBadge from './VerificationBadge';
+import VerificationBadge from './index';
 
 describe('VerificationBadge', () => {
   it('renders verified badge with basic level', () => {
