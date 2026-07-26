@@ -1,14 +1,8 @@
-import { useState } from 'react';
-import { UseFormRegister, FieldErrors } from 'react-hook-form';
-import { Input } from '../../ui/Input';
-import { LocateFixed } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-interface LocationStepProps {
-  register: UseFormRegister<any>;
-  errors: FieldErrors;
-  formData: any;
-}
+import { useState } from 'react'
+import { Input } from '../../ui/Input'
+import { LocateFixed } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { LocationStepProps } from '../types'
 
 export function LocationStep({ register, errors, formData }: LocationStepProps) {
   const [locating, setLocating] = useState(false);

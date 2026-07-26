@@ -182,7 +182,7 @@ export const WasteFilterUI: React.FC<WasteFilterUIProps> = ({
               id="verification-status"
               value={filters.verificationStatus || 'all'}
               onChange={(e) =>
-                onFilterChange({ verificationStatus: e.target.value as any })
+                onFilterChange({ verificationStatus: e.target.value as 'verified' | 'unverified' | 'all' })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >

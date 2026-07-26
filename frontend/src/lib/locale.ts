@@ -57,31 +57,8 @@ export function clearLocaleOverride(): void {
   localStorage.removeItem(OVERRIDE_KEY)
 }
 
-// ── Formatters ────────────────────────────────────────────────────────────────
-
-export function formatCurrency(amount: number, locale?: string, currency?: string): string {
-  const resolved = locale ?? detectLocale()
-  const config = getLocaleConfig(resolved)
-  try {
-    return new Intl.NumberFormat(config.currencyLocale, {
-      style: 'currency',
-      currency: currency ?? config.currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  } catch {
-    return `${currency ?? config.currency} ${amount.toFixed(2)}`
-  }
-}
-
-export function formatNumber(value: number, locale?: string, fractionDigits = 2): string {
-  const resolved = locale ?? detectLocale()
-  const config = getLocaleConfig(resolved)
-  return new Intl.NumberFormat(config.currencyLocale, {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  }).format(value)
-}
+// Formatters moved to lib/format.ts
+export { formatCurrency, formatNumber, formatDate } from './format'
 
 const KG_TO_LB = 2.20462
 const KM_TO_MI = 0.621371

@@ -36,6 +36,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { OfflineIndicator } from '@/components/OfflineIndicator'
 import { OnboardingTutorial, useOnboardingTutorial } from '@/components/OnboardingTutorial'
+import { UserRole } from '@/hooks/useOnboarding'
 
 const NAV_LINKS = [
   {
@@ -180,7 +181,7 @@ function getOnboardingDataAttribute(href: string): string | undefined {
 export function AppShell({ children }: PropsWithChildren) {
   const { address, isConnected, connect, disconnect, isLoading } = useWallet()
   const { user, logout } = useAuth()
-  const { isVisible, hideTutorial } = useOnboardingTutorial(user?.role as any)
+  const { isVisible, hideTutorial } = useOnboardingTutorial((user?.role as UserRole | undefined) ?? null)
 
   const role = user?.role ?? ''
   const links = NAV_LINKS.filter((l) => !role || l.roles.includes(role))
@@ -314,7 +315,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
       {/* Onboarding Tutorial */}
       <OnboardingTutorial
-        userRole={user?.role as any}
+        userRole={(user?.role as UserRole | undefined) ?? null}
         isVisible={isVisible}
         onComplete={hideTutorial}
       />

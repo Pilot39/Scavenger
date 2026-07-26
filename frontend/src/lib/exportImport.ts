@@ -1,7 +1,8 @@
 import { Waste, WasteType, Participant, ParticipantStats } from '@/api/types'
 import Papa from 'papaparse'
 import { jsPDF } from 'jspdf'
-import { wasteTypeLabel, roleLabel, formatDate } from './helpers'
+import { wasteTypeLabel, roleLabel } from './helpers'
+import { formatDate } from './format'
 
 /* ────────────────────────────────────────────────────────────────
    CSV / JSON Export — Waste records
