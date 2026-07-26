@@ -67,7 +67,7 @@ impl ArchivalStorage for FileSystemArchivalStorage {
     async fn move_to_tier(&self, path: &str, tier: &StorageTier) -> Result<()> {
         // In a real implementation, this would move files between storage tiers
         // For file system storage, we'll just log the operation
-        tracing::info!("Moving {} to tier {:?}", path, tier);
+        tracing::debug!("Moving {} to tier {:?}", path, tier);
         Ok(())
     }
 }
@@ -94,7 +94,7 @@ impl S3ArchivalStorage {
 impl ArchivalStorage for S3ArchivalStorage {
     async fn store(&self, data: &[u8], path: &str) -> Result<String> {
         // In a real implementation, use AWS SDK to upload to S3
-        tracing::info!("Storing to S3: s3://{}/{}", self.bucket, path);
+        tracing::debug!("Storing to S3: s3://{}/{}", self.bucket, path);
         
         // Calculate checksum
         let mut hasher = Sha256::new();
@@ -104,19 +104,19 @@ impl ArchivalStorage for S3ArchivalStorage {
     
     async fn retrieve(&self, path: &str) -> Result<Vec<u8>> {
         // In a real implementation, use AWS SDK to download from S3
-        tracing::info!("Retrieving from S3: s3://{}/{}", self.bucket, path);
+        tracing::debug!("Retrieving from S3: s3://{}/{}", self.bucket, path);
         Ok(Vec::new())
     }
     
     async fn delete(&self, path: &str) -> Result<()> {
         // In a real implementation, use AWS SDK to delete from S3
-        tracing::info!("Deleting from S3: s3://{}/{}", self.bucket, path);
+        tracing::debug!("Deleting from S3: s3://{}/{}", self.bucket, path);
         Ok(())
     }
     
     async fn exists(&self, path: &str) -> Result<bool> {
         // In a real implementation, check if object exists in S3
-        tracing::info!("Checking S3: s3://{}/{}", self.bucket, path);
+        tracing::debug!("Checking S3: s3://{}/{}", self.bucket, path);
         Ok(false)
     }
     
@@ -129,7 +129,7 @@ impl ArchivalStorage for S3ArchivalStorage {
             StorageTier::Glacier => "DEEP_ARCHIVE",
         };
         
-        tracing::info!("Moving s3://{}/{} to storage class {}", 
+        tracing::debug!("Moving s3://{}/{} to storage class {}", 
             self.bucket, path, storage_class);
         Ok(())
     }
