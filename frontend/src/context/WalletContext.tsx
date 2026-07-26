@@ -5,12 +5,16 @@
  * Existing components that call useWallet() continue to work unchanged.
  *
  * The actual state and dispatch live in StoreProvider (store/index.tsx).
- * Freighter API calls are handled here in WalletProvider (the one place
- * that knows about the external Freighter dependency).
+ * Freighter API calls are handled via lib/wallet.ts service.
  */
 import React, { useEffect, type ReactNode } from 'react'
-import { isConnected, requestAccess, getPublicKey, isBrowser } from '@stellar/freighter-api'
+import { isBrowser } from '@stellar/freighter-api'
 import { useWalletStore } from '@/store'
+import {
+  checkWalletInstalled,
+  getWalletPublicKey,
+  connectWallet,
+} from '@/lib/wallet'
 
 // ── Type kept for import compatibility ───────────────────────────
 export interface WalletContextType {
@@ -37,10 +41,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
     ;(async () => {
       try {
-        const connected = await isConnected()
-        dispatch({ type: 'WALLET_INSTALLED', payload: true })
-        if (connected) {
-          const addr = await getPublicKey()
+        const isInstalled = await checkWalletInstalled()
+        dispatch({ type: 'WALLET_INSTALLED', payload: isInstalled })
+        if (isInstalled) {
+          const addr = await getWalletPublicKey()
           if (addr) dispatch({ type: 'WALLET_CONNECTED', payload: addr })
           else dispatch({ type: 'WALLET_READY' })
         } else {
@@ -74,13 +78,13 @@ export function useWallet(): WalletContextType {
       return
     }
     try {
-      const addr = await requestAccess()
+      const addr = await connectWallet()
       dispatch({ type: 'WALLET_CONNECTED', payload: addr })
     } catch (err: unknown) {
-      const msg = (err instanceof Error ? err.message : String(err)) ?? ''
+      const msg = err instanceof Error ? err.message : String(err)
       dispatch({
         type: 'WALLET_ERROR',
-        payload: msg.includes('User declined') ? 'Connection rejected.' : 'Failed to connect wallet.',
+        payload: msg,
       })
     }
   }
