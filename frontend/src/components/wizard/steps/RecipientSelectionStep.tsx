@@ -1,11 +1,5 @@
-import { UseFormRegister, FieldErrors } from 'react-hook-form';
-import { Input } from '../../ui/Input';
-
-interface RecipientSelectionStepProps {
-  register: UseFormRegister<any>;
-  errors: FieldErrors;
-  formData: any;
-}
+import { Input } from '../../ui/Input'
+import { RecipientSelectionStepProps } from '../types'
 
 const mockRecipients = [
   { address: 'GABC...XYZ1', name: 'Recycling Center A', type: 'Recycler' },

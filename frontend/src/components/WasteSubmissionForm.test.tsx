@@ -9,8 +9,13 @@ vi.mock('@/hooks/useImageUpload', () => ({
   MAX_SIZE_MB: 5,
 }))
 
+interface MockImageUploadProps {
+  images: File[]
+  validationError: string | null
+}
+
 vi.mock('@/components/ui/ImageUpload', () => ({
-  ImageUpload: ({ images, validationError }: any) => (
+  ImageUpload: ({ images, validationError }: MockImageUploadProps) => (
     <div data-testid="image-upload">
       <span data-testid="image-count">{images.length}</span>
       {validationError && <span data-testid="image-error">{validationError}</span>}
