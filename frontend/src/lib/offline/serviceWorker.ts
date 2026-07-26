@@ -24,14 +24,6 @@ export async function registerServiceWorker(config?: ServiceWorkerConfig): Promi
       if (isLocalhost) {
         // Check if a service worker still exists or not
         await checkValidServiceWorker(swUrl, config);
-        
-        // Add some helpful logging for localhost
-        navigator.serviceWorker.ready.then(() => {
-          console.log(
-            'This web app is being served cache-first by a service worker. ' +
-            'To learn more, visit https://cra.link/PWA'
-          );
-        });
       } else {
         // Register service worker in production
         await registerValidSW(swUrl, config);
@@ -54,11 +46,9 @@ async function registerValidSW(swUrl: string, config?: ServiceWorkerConfig): Pro
         if (installingWorker.state === 'installed') {
           if (navigator.serviceWorker.controller) {
             // New content available, notify user
-            console.log('New content is available; please refresh.');
             config?.onUpdate?.(registration);
           } else {
             // Content cached for offline use
-            console.log('Content is cached for offline use.');
             config?.onSuccess?.(registration);
             config?.onOfflineReady?.();
           }
@@ -90,7 +80,7 @@ async function checkValidServiceWorker(swUrl: string, config?: ServiceWorkerConf
       await registerValidSW(swUrl, config);
     }
   } catch {
-    console.log('No internet connection found. App is running in offline mode.');
+    // No internet connection found; app continues in offline mode
   }
 }
 
@@ -99,7 +89,6 @@ export async function unregisterServiceWorker(): Promise<void> {
     try {
       const registration = await navigator.serviceWorker.ready;
       await registration.unregister();
-      console.log('Service worker unregistered');
     } catch (error) {
       console.error('Error unregistering service worker:', error);
     }
