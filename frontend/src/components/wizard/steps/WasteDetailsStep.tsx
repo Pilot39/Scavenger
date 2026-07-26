@@ -23,10 +23,7 @@ export function WasteDetailsStep({ register, errors }: WasteDetailsStepProps) {
           min="1"
           step="1"
           placeholder="Enter weight in grams"
-          {...register('weight', { 
-            required: 'Weight is required',
-            min: { value: 1, message: 'Weight must be at least 1 gram' }
-          })}
+          {...register('weight')}
         />
         {errors.weight && (
           <p className="text-sm text-red-500 mt-1">{errors.weight.message as string}</p>

@@ -19,11 +19,6 @@ import './index.css'
 
 // Initialize Web Vitals monitoring
 initWebVitals((metric) => {
-  // Log to console in development
-  if (import.meta.env.DEV) {
-    console.debug(`[Web Vital] ${metric.name}: ${metric.value.toFixed(0)}ms (${metric.rating})`)
-  }
-  
   // Optionally send to analytics endpoint in production
   if (!import.meta.env.DEV) {
     try {

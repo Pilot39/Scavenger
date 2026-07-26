@@ -66,8 +66,6 @@ export class SyncManager {
         return result;
       }
 
-      console.log(`📤 Syncing ${pending.length} pending mutations...`);
-
       for (const mutation of pending) {
         try {
           await this.syncSingleMutation(mutation);
@@ -82,9 +80,6 @@ export class SyncManager {
         }
       }
 
-      console.log(
-        `✅ Sync complete: ${result.success} succeeded, ${result.failed} failed`
-      );
     } catch (error) {
       console.error('Sync failed:', error);
       throw error;
