@@ -76,7 +76,7 @@ where
 
         Box::pin(
             async move {
-                tracing::info!("request started");
+                tracing::debug!("request started");
                 let mut res = fut.await?;
                 let elapsed_ms = started_at.elapsed().as_millis();
                 tracing::info!(

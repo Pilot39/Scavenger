@@ -90,7 +90,7 @@ async fn main() -> std::io::Result<()> {
             Arc::new(client)
         }
         Err(e) => {
-            info!("Failed to initialize search client: {}. Search functionality will be limited.", e);
+            tracing::error!("Failed to initialize search client: {}. Search functionality will be limited.", e);
             return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
         }
     };
@@ -103,15 +103,7 @@ async fn main() -> std::io::Result<()> {
     ));
     let archival_service = Arc::new(ArchivalService::new(archival_storage));
     
-    info!("Archival service initialized");
-
-    info!(
-        cache_ttl = 300,
-        "Cache layer initialized with 5-minute default TTL"
-    );
-    info!("Audit service initialized");
-    info!("WebSocket manager initialized");
-    info!("Verification service initialized");
+    info!("All services initialized (archival, cache, audit, websocket, verification)");
 
     HttpServer::new(move || {
         let cors = {

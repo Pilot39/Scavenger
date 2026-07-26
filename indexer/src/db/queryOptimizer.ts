@@ -1,4 +1,5 @@
 import { PoolClient } from 'pg';
+import { logger } from '../utils/logger';
 
 /**
  * Query performance monitoring and optimization utilities
@@ -23,7 +24,11 @@ export function recordQueryMetric(query: string, duration: number, rows: number)
   });
 
   if (duration > SLOW_QUERY_THRESHOLD) {
-    console.warn(`[SLOW QUERY] ${duration}ms: ${query.substring(0, 80)}...`);
+    logger.warn('Slow query detected', {
+      duration_ms: duration,
+      query: query.substring(0, 80),
+      rows,
+    });
   }
 }
 
