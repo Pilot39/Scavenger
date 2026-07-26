@@ -1,14 +1,29 @@
-use soroban_sdk::{Address, Env};
+use soroban_sdk::Address;
 
 pub fn validate_positive_amount(amount: i128, field_name: &str) {
     if amount <= 0 {
-        panic!("{} must be positive", field_name);
+        panic!("{} must be greater than zero", field_name);
     }
 }
 
-pub fn validate_percentage(percentage: u32, field_name: &str) {
-    if percentage > 100 {
-        panic!("{} must be <= 100", field_name);
+pub fn validate_positive_u128(amount: u128, field_name: &str) {
+    if amount == 0 {
+        panic!("{} must be greater than zero", field_name);
+    }
+}
+
+/// Validates a waste/material weight: must be non-zero and within `max`.
+pub fn validate_weight(weight: u128, max: u128) {
+    validate_positive_u128(weight, "Waste weight");
+    if weight > max {
+        panic!("Waste weight exceeds maximum allowed");
+    }
+}
+
+/// Validates that two reward-distribution percentages don't sum past 100.
+pub fn validate_percentage_sum(collector_percentage: u32, owner_percentage: u32) {
+    if collector_percentage + owner_percentage > 100 {
+        panic!("Total percentages cannot exceed 100");
     }
 }
 
@@ -25,20 +40,8 @@ pub fn validate_coordinates(latitude: i128, longitude: i128) {
     }
 }
 
-pub fn validate_address_not_contract(env: &Env, address: &Address) {
-    if address == &env.current_contract_address() {
-        panic!("Address cannot be the contract itself");
-    }
-}
-
 pub fn validate_addresses_different(addr1: &Address, addr2: &Address, context: &str) {
     if addr1 == addr2 {
         panic!("{}: addresses must be different", context);
-    }
-}
-
-pub fn validate_positive_u128(amount: u128, field_name: &str) {
-    if amount == 0 {
-        panic!("{} must be greater than zero", field_name);
     }
 }
