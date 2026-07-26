@@ -1,0 +1,11 @@
+//! Stellar RPC access layer — created as part of issue #907.
+//!
+//! All Horizon and Soroban RPC interactions must go through [`StellarRpcClient`].
+//! Direct `reqwest` calls in handlers are not permitted.
+
+pub mod client;
+
+pub use client::{
+    ContractDataEntry, LatestLedger, RetryConfig, RpcError, StellarAccount, StellarRpcClient,
+    StellarRpcConfig, TransactionResult, Balance,
+};

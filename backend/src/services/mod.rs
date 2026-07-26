@@ -2,9 +2,6 @@ pub mod email;
 pub mod notifications;
 pub mod reporting;
 pub mod storage;
-pub mod recommendations;
-pub mod nft;
-pub mod multichain;
 pub mod api;
 pub mod webhook;
 pub mod export;
@@ -19,13 +16,15 @@ pub mod encryption_verification;
 pub mod archival;
 pub mod archival_storage;
 
+// Dead services removed (#906): recommendations, nft, multichain
+// These were exported but never injected into app state or used by any handler.
+
+pub mod verification;
+pub use verification::{VerificationService, DefaultVerificationService};
 pub use email::{EmailService, SendGridEmailService};
 pub use notifications::{NotificationService, FirebaseNotificationService};
 pub use reporting::{ReportService, ReportingService};
 pub use storage::{StorageService, S3StorageService};
-pub use recommendations::RecommendationEngine;
-pub use nft::NFTManager;
-pub use multichain::ChainAbstraction;
 pub use api::ApiBuilder;
 pub use webhook::{WebhookManager, WebhookEvent, Webhook};
 pub use export::{ExportService, ExportFormat, ExportData};
