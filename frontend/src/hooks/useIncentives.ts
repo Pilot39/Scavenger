@@ -3,6 +3,7 @@ import { Incentive, WasteType } from '@/api/types'
 import { useContract } from '@/context/ContractContext'
 import { networkConfig } from '@/lib/stellar'
 import { useWallet } from '@/context/WalletContext'
+import { useToast } from '@/hooks/useToast'
 import { ScavengerClient } from '@/api/client'
 
 const INCENTIVES_STALE_TIME = 30 * 1000 // 30 seconds
@@ -11,6 +12,7 @@ export function useIncentives(wasteType?: WasteType) {
   const { config } = useContract()
   const { address } = useWallet()
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const { data, isLoading, isError } = useQuery<Incentive[]>({
     queryKey: ['incentives', wasteType ?? 'all'],
@@ -33,15 +35,18 @@ export function useIncentives(wasteType?: WasteType) {
       contractId: config.contractId,
     })
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ['incentives'] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['incentives'] })
 
   const createIncentive = useMutation({
     mutationFn: ({ wt, rewardPoints, budget }: { wt: WasteType; rewardPoints: bigint; budget: bigint }) => {
       if (!address) throw new Error('Wallet not connected')
       return getClient().createIncentive(address, wt, rewardPoints, budget, address)
     },
-    onSuccess: invalidate,
+    onSuccess: (incentive) => {
+      invalidate()
+      toast.success(`Incentive #${incentive.id} created successfully.`)
+    },
+    onError: (error) => toast.error(error),
   })
 
   const updateIncentive = useMutation({
@@ -49,7 +54,11 @@ export function useIncentives(wasteType?: WasteType) {
       if (!address) throw new Error('Wallet not connected')
       return getClient().updateIncentive(id, address, rewardPoints, budget, address)
     },
-    onSuccess: invalidate,
+    onSuccess: (incentive) => {
+      invalidate()
+      toast.success(`Incentive #${incentive.id} updated successfully.`)
+    },
+    onError: (error) => toast.error(error),
   })
 
   const deactivateIncentive = useMutation({
@@ -57,7 +66,11 @@ export function useIncentives(wasteType?: WasteType) {
       if (!address) throw new Error('Wallet not connected')
       return getClient().deactivateIncentive(id, address, address)
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate()
+      toast.success('Incentive deactivated.')
+    },
+    onError: (error) => toast.error(error),
   })
 
   return {

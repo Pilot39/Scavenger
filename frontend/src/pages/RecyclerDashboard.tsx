@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Coins, Recycle, Weight } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Coins, Recycle, Weight, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { StatCardSkeleton } from '@/components/ui/Skeletons'
-import { AddressDisplay } from '@/components/ui/AddressDisplay'
 import { RegisterWasteModal } from '@/components/modals/RegisterWasteModal'
+import { TransferWasteModal } from '@/components/modals/TransferWasteModal'
 import { useAuth } from '@/context/AuthContext'
 import { useAppTitle } from '@/hooks/useAppTitle'
+import { useResource } from '@/hooks/useResource'
 import { ScavengerClient } from '@/api/client'
 import { Material, Incentive, ParticipantStats, WasteType } from '@/api/types'
 import { config } from '@/config'
@@ -16,7 +18,7 @@ import { networkConfig } from '@/lib/stellar'
 const client = new ScavengerClient({
   rpcUrl: networkConfig.rpcUrl,
   networkPassphrase: networkConfig.networkPassphrase,
-  contractId: config.contractId,
+  contractId: config.contractId
 })
 
 const WASTE_LABELS: Record<WasteType, string> = {
@@ -24,7 +26,7 @@ const WASTE_LABELS: Record<WasteType, string> = {
   [WasteType.PetPlastic]: 'PET Plastic',
   [WasteType.Plastic]: 'Plastic',
   [WasteType.Metal]: 'Metal',
-  [WasteType.Glass]: 'Glass',
+  [WasteType.Glass]: 'Glass'
 }
 
 function statusVariant(m: Material): 'default' | 'secondary' | 'outline' | 'destructive' {
@@ -46,40 +48,40 @@ export function RecyclerDashboard() {
   const { user } = useAuth()
   const address = user?.address ?? ''
 
-  const [stats, setStats] = useState<ParticipantStats | null>(null)
-  const [wastes, setWastes] = useState<Material[]>([])
-  const [incentives, setIncentives] = useState<Incentive[]>([])
-  const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [transferWasteId, setTransferWasteId] = useState<bigint | null>(null)
 
-  const load = useCallback(async () => {
-    if (!address) return
-    setLoading(true)
-    try {
-      const [participantStats, wasteIds, activeIncentives] = await Promise.all([
-        client.getStats(address),
-        client.getParticipantWastes(address),
-        client.getActiveIncentives(),
-      ])
-      setStats(participantStats)
-      setIncentives(activeIncentives.slice(0, 5))
+  const { data, isLoading: loading, reload: load } = useResource(async () => {
+    if (!address) return null
+    const [participantStats, wasteIds, activeIncentives] = await Promise.all([
+      client.getStats(address),
+      client.getParticipantWastes(address),
+      client.getActiveIncentives()
+    ])
 
-      const materials = await Promise.all(
-        wasteIds.slice(-10).reverse().map((id) => client.getMaterial(id))
-      )
-      setWastes(materials.filter(Boolean) as Material[])
-    } finally {
-      setLoading(false)
+    const materials = await Promise.all(
+      wasteIds
+        .slice(-10)
+        .reverse()
+        .map((id) => client.getMaterial(id))
+    )
+
+    return {
+      stats: participantStats,
+      incentives: activeIncentives.slice(0, 5),
+      wastes: materials.filter(Boolean) as Material[]
     }
   }, [address])
 
-  useEffect(() => { load() }, [load])
+  const stats: ParticipantStats | null = data?.stats ?? null
+  const wastes: Material[] = data?.wastes ?? []
+  const incentives: Incentive[] = data?.incentives ?? []
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Button onClick={() => setModalOpen(true)}>
+    <div className="space-y-6 overflow-x-hidden px-4 py-6 sm:px-0 sm:py-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-bold sm:text-2xl">Dashboard</h1>
+        <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Register Waste
         </Button>
@@ -93,7 +95,9 @@ export function RecyclerDashboard() {
           <>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Token Balance</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Token Balance
+                </CardTitle>
                 <Coins className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -103,7 +107,9 @@ export function RecyclerDashboard() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Wastes Submitted</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Wastes Submitted
+                </CardTitle>
                 <Recycle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -113,7 +119,9 @@ export function RecyclerDashboard() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Transfers</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Transfers
+                </CardTitle>
                 <Weight className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -143,18 +151,37 @@ export function RecyclerDashboard() {
               ))}
             </div>
           ) : wastes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No wastes submitted yet.</p>
+            <EmptyState
+              icon={Recycle}
+              title="No wastes submitted"
+              description="Start by submitting your first waste"
+              action={{ label: 'Register Waste', onClick: () => setModalOpen(true) }}
+            />
           ) : (
             <div className="divide-y">
               {wastes.map((m) => (
-                <div key={m.id} className="flex items-center justify-between py-3">
+                <div
+                  key={m.id}
+                  className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium">
                       #{m.id} · {WASTE_LABELS[m.waste_type]}
                     </p>
                     <p className="text-xs text-muted-foreground">{m.weight} kg</p>
                   </div>
-                  <Badge variant={statusVariant(m)}>{statusLabel(m)}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={statusVariant(m)}>{statusLabel(m)}</Badge>
+                    {m.is_active && !m.is_confirmed && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setTransferWasteId(BigInt(m.id))}
+                      >
+                        Transfer
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -181,11 +208,18 @@ export function RecyclerDashboard() {
               ))}
             </div>
           ) : incentives.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No active incentives.</p>
+            <EmptyState
+              icon={Zap}
+              title="No active incentives"
+              description="Incentives will appear once manufacturers create them"
+            />
           ) : (
             <div className="divide-y">
               {incentives.map((inc) => (
-                <div key={inc.id} className="flex items-center justify-between py-3">
+                <div
+                  key={inc.id}
+                  className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium">{WASTE_LABELS[inc.waste_type]}</p>
                     <p className="text-xs text-muted-foreground">
@@ -206,7 +240,25 @@ export function RecyclerDashboard() {
         open={modalOpen}
         address={address}
         onClose={() => setModalOpen(false)}
-        onSuccess={() => { setModalOpen(false); load() }}
+        onSuccess={() => {
+          setModalOpen(false)
+          load()
+        }}
+      />
+
+      <TransferWasteModal
+        open={transferWasteId !== null}
+        waste={
+          transferWasteId !== null
+            ? ((wastes.find(
+                (w) => BigInt(w.id) === transferWasteId
+              ) as unknown as import('@/api/types').Waste) ?? null)
+            : null
+        }
+        onClose={() => {
+          setTransferWasteId(null)
+          load()
+        }}
       />
     </div>
   )

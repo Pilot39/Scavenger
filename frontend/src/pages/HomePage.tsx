@@ -1,14 +1,24 @@
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
+import { Role } from '@/api/types'
 import { useAppTitle } from '@hooks/useAppTitle'
+
+const ROLE_ROUTES: Record<string, string> = {
+  [Role.Recycler]: '/dashboard/recycler',
+  [Role.Collector]: '/collect',
+  [Role.Manufacturer]: '/manufacturer',
+}
 
 export function HomePage() {
   useAppTitle('Scavngr Dashboard')
+  const { user } = useAuth()
+  const navigate = useNavigate()
 
-  return (
-    <section className="space-y-4">
-      <h1 className="text-3xl font-bold text-brand-700">Scavngr Frontend Initialized</h1>
-      <p className="text-slate-600">
-        React + TypeScript + Vite is configured with Tailwind, aliases, linting, and formatting.
-      </p>
-    </section>
-  )
+  useEffect(() => {
+    const route = user?.role ? ROLE_ROUTES[user.role] : null
+    if (route) navigate(route, { replace: true })
+  }, [user, navigate])
+
+  return null
 }

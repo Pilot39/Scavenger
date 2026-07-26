@@ -22,6 +22,8 @@ fn test_donate_zero_amount() {
         &soroban_sdk::symbol_short!("Donor"),
         &45_000_000,
         &-93_000_000,
+        &0,
+        &0,
     );
     client.set_charity_contract(&admin, &charity);
     client.donate_to_charity(&donor, &0);

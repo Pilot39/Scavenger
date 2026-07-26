@@ -41,23 +41,35 @@ export function WalletModal({ open, onOpenChange }: WalletModalProps) {
               {isConnected ? 'Wallet Connected' : 'Connect Wallet'}
             </Dialog.Title>
             <Dialog.Close asChild>
-              <button className="text-muted-foreground hover:text-foreground" aria-label="Close">
-                <X size={18} />
+              <button
+                className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="Close wallet dialog"
+              >
+                <X size={18} aria-hidden="true" />
               </button>
             </Dialog.Close>
           </div>
+          <Dialog.Description className="sr-only">
+            {isConnected
+              ? 'Your wallet is currently connected. You can disconnect it here.'
+              : 'Select a wallet to connect to the Scavngr platform.'}
+          </Dialog.Description>
 
           {isConnected ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">Connected as</p>
               <p className="font-mono text-sm bg-muted rounded px-3 py-2">{address}</p>
-              <Button variant="destructive" className="w-full" onClick={() => { disconnect(); onOpenChange(false); }}>
+              <Button variant="destructive" className="w-full" autoFocus onClick={() => { disconnect(); onOpenChange(false); }}>
                 Disconnect
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p role="alert" aria-live="assertive" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               {WALLETS.map((wallet) => {
                 const supported = wallet.id === 'freighter';
                 const notInstalled = supported && !isInstalled;
