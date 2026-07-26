@@ -23,6 +23,7 @@ import { useContract } from '@/context/ContractContext'
 import { useWallet } from '@/context/WalletContext'
 import { networkConfig } from '@/lib/stellar'
 import { wasteTypeLabel, formatDate, formatAddress } from '@/lib/helpers'
+import { isValidStellarAddress } from '@/lib/validation/stellarAddress'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -89,12 +90,6 @@ function addTransferRecord(record: LocalTransferRecord) {
 
 function getTransferHistory(): LocalTransferRecord[] {
   return [..._transferHistory]
-}
-
-// ── Validation helpers ──────────────────────────────────────────────────────
-
-function isValidStellarAddress(address: string): boolean {
-  return /^G[A-Z2-7]{55}$/.test(address)
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
