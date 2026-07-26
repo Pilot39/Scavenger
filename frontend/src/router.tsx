@@ -169,9 +169,6 @@ const QRCodePage = lazy(() =>
 const OfflineSettings = lazy(() =>
   import('@/pages/OfflineSettings').then((m) => ({ default: m.OfflineSettings }))
 )
-const ThemeSettings = lazy(() =>
-  import('@/pages/ThemeSettings').then((m) => ({ default: m.ThemeSettings }))
-)
 
 // ─── Suspense wrapper ─────────────────────────────────────────────────────────
 // Wraps the route outlet in a Suspense boundary so every lazy page gets a
@@ -221,7 +218,6 @@ export const router = createBrowserRouter([
       { path: 'manufacturer', element: <ManufacturerDashboardPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'settings/offline', element: <OfflineSettings /> },
-      { path: 'settings/theme', element: <ThemeSettings /> },
       { path: 'rewards', element: <RewardsPage /> },
       { path: 'tracker', element: <SupplyChainTrackerPage /> },
       { path: 'community', element: <CommunityPage /> },
