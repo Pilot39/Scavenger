@@ -20,6 +20,8 @@ fn test_donate_zero_amount() {
         &donor,
         &ParticipantRole::Recycler,
         &soroban_sdk::symbol_short!("Donor"),
+        &45_000_000,
+        &-93_000_000,
         &0,
         &0,
     );

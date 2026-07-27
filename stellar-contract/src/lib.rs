@@ -603,7 +603,10 @@ impl ScavengerContract {
             Self::unlock(&env);
             panic!("Insufficient balance");
         }
-        participant.total_tokens_earned -= donation_amount;
+        participant.total_tokens_earned = participant
+            .total_tokens_earned
+            .checked_sub(donation_amount)
+            .expect("Overflow in donor balance");
         env.storage().instance().set(&donor_key, &participant);
 
         // Get charity contract address
@@ -1067,8 +1070,14 @@ impl ScavengerContract {
         let collector_pct = cfg.collector_percentage;
         let owner_pct = cfg.owner_percentage;
 
-        let collector_share = (total_reward * (collector_pct as u128)) / 100;
-        let owner_share = (total_reward * (owner_pct as u128)) / 100;
+        let collector_share = total_reward
+            .checked_mul(collector_pct as u128)
+            .expect("Overflow in collector share")
+            / 100;
+        let owner_share = total_reward
+            .checked_mul(owner_pct as u128)
+            .expect("Overflow in owner share")
+            / 100;
 
         // Read transfer history once
         let transfers = Self::get_transfer_history(env.clone(), waste_id);
@@ -1081,6 +1090,11 @@ impl ScavengerContract {
             let participant: Option<Participant> = env.storage().instance().get(&key);
             if let Some(p) = participant {
                 if matches!(p.role, ParticipantRole::Collector) {
+                    total_distributed = total_distributed
+                        .checked_add(collector_share)
+                        .expect("Overflow in total distributed");
+                    Self::update_participant_stats(env, &transfer.to, 0, collector_share as u64);
+                    events::emit_tokens_rewarded(env, &transfer.to, collector_share, waste_id);
                     let base_share = collector_share;
                     let cert_multiplier = p.certification.reward_multiplier() as u128;
                     let tier_multiplier = p.tier.reward_multiplier() as u128;
@@ -1095,8 +1109,14 @@ impl ScavengerContract {
         // Reward the current owner (submitter) — merge owner_share + remainder into one
         // read-modify-write instead of two separate calls.
         if let Some(material) = Self::get_waste_internal(env, waste_id) {
-            let recycler_amount = total_reward.saturating_sub(total_distributed + owner_share);
-            let submitter_total = owner_share + recycler_amount; // = total_reward - total_distributed
+            let recycler_amount = total_reward.saturating_sub(
+                total_distributed
+                    .checked_add(owner_share)
+                    .expect("Overflow in distributed total"),
+            );
+            let submitter_total = owner_share
+                .checked_add(recycler_amount)
+                .expect("Overflow in submitter total"); // = total_reward - total_distributed
 
             if submitter_total > 0 {
                 let key = (material.submitter.clone(),);
@@ -1334,7 +1354,7 @@ impl ScavengerContract {
     /// Increment and return the next waste ID
     fn next_waste_id(env: &Env) -> u64 {
         let count = Self::get_waste_count(env);
-        let next_id = count + 1;
+        let next_id = count.checked_add(1).expect("Overflow in waste count");
         env.storage().instance().set(&("waste_count",), &next_id);
         next_id
     }
@@ -1350,7 +1370,7 @@ impl ScavengerContract {
     /// Increment and return the next incentive ID
     fn next_incentive_id(env: &Env) -> u64 {
         let count = Self::get_incentive_count(env);
-        let next_id = count + 1;
+        let next_id = count.checked_add(1).expect("Overflow in incentive count");
         env.storage()
             .instance()
             .set(&("incentive_count",), &next_id);
@@ -1517,7 +1537,10 @@ impl ScavengerContract {
         }
 
         // Calculate how much budget has been used
-        let budget_used = incentive.total_budget - incentive.remaining_budget;
+        let budget_used = incentive
+            .total_budget
+            .checked_sub(incentive.remaining_budget)
+            .expect("Overflow in budget used");
 
         // Step 5: Update fields (atomic)
         incentive.reward_points = new_reward_points;
@@ -1525,7 +1548,9 @@ impl ScavengerContract {
 
         // Adjust remaining budget based on new total budget
         if new_total_budget > budget_used {
-            incentive.remaining_budget = new_total_budget - budget_used;
+            incentive.remaining_budget = new_total_budget
+                .checked_sub(budget_used)
+                .expect("Overflow in remaining budget");
         } else {
             incentive.remaining_budget = 0;
             incentive.active = false;
@@ -1585,6 +1610,12 @@ impl ScavengerContract {
 
         // Calculate reward: (weight in kg) * reward_points
         let weight_kg = waste_amount / 1000;
+        let reward = weight_kg
+            .checked_mul(incentive.reward_points)
+            .expect("Overflow in reward calculation");
+
+        // Exact reward calculation instead of capping
+        reward
         weight_kg * incentive.reward_points
     }
 
@@ -3879,6 +3910,10 @@ impl ScavengerContract {
         env.storage().instance().get(&("carb_list", listing_id))
     }
 
+    /// Get global contract metrics (total waste count and total tokens earned)
+    pub fn get_metrics(env: Env) -> types::GlobalMetrics {
+        let total_wastes_count: u64 = Self::get_waste_count(&env);
+        let total_tokens_earned: u128 = env
     /// Get all currently-active carbon-credit listings.
     pub fn get_active_carbon_listings(env: Env) -> Vec<CarbonListing> {
         let idx: Vec<u64> = env
@@ -4038,6 +4073,19 @@ impl ScavengerContract {
         reporter.require_auth();
         Self::require_not_paused(&env);
 
+        let weight_kg = material.weight / 1000;
+        let total_reward = (incentive.reward_points as i128)
+            .checked_mul(weight_kg as i128)
+            .expect("Overflow in total reward");
+        assert!(
+            total_reward <= (incentive.remaining_budget as i128),
+            "Insufficient incentive budget"
+        );
+
+        let transfers = Self::get_transfer_history(env.clone(), waste_id);
+        let cfg = Self::get_reward_config(&env);
+        let collector_pct = cfg.collector_percentage;
+        let owner_pct = cfg.owner_percentage;
         assert!(level <= 100, "Contamination level must be 0-100");
         assert!(reason.len() <= 200, "Reason exceeds 200 characters");
 
@@ -4066,6 +4114,26 @@ impl ScavengerContract {
             .get(&("waste_v2", waste_id))
             .expect("Waste not found");
 
+        let collector_share = total_reward
+            .checked_mul(collector_pct as i128)
+            .expect("Overflow in collector share")
+            / 100;
+        let owner_share = total_reward
+            .checked_mul(owner_pct as i128)
+            .expect("Overflow in owner share")
+            / 100;
+        let mut total_distributed: i128 = 0;
+
+        for transfer in transfers.iter() {
+            let key = (transfer.to.clone(),);
+            if let Some(p) = env.storage().instance().get::<_, Participant>(&key) {
+                if p.role.can_collect_materials() && !p.role.can_manufacture() {
+                    token_client.transfer(&manufacturer, &transfer.to, &collector_share);
+                    Self::update_participant_stats(&env, &transfer.to, 0, collector_share as u64);
+                    events::emit_tokens_rewarded(&env, &transfer.to, collector_share as u128, waste_id);
+                    total_distributed = total_distributed
+                        .checked_add(collector_share)
+                        .expect("Overflow in total distributed");
         let report = types::ContaminationReport {
             waste_id,
             reporter: reporter.clone(),
