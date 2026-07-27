@@ -2,8 +2,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::types::{AppError, FieldError, ValidationError};
+use crate::services::api::{ApiErrorPayload, ApiResponse, FieldDetail, ResponseMeta};
 
 /// Wire format sent to API clients for every error response.
+///
+/// #918: `ErrorResponse` now wraps an `ApiErrorPayload` so that error responses
+/// share the same `{data, error, meta}` envelope as success responses.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorResponse {
     pub error: ErrorBody,
@@ -26,15 +30,24 @@ pub struct ErrorBody {
 
 impl AppError {
     /// Serialise to the canonical JSON wire format.
-    pub fn to_response_body(&self) -> ErrorResponse {
-        ErrorResponse {
-            error: ErrorBody {
+    ///
+    /// #918: Returns the full `{data, error, meta}` envelope.
+    pub fn to_response_body(&self) -> ApiResponse<()> {
+        let fields = validation_fields(self).map(|fs| {
+            fs.into_iter()
+                .map(|f| FieldDetail { field: f.field, message: f.message })
+                .collect::<Vec<_>>()
+        });
+
+        ApiResponse {
+            data: None,
+            error: Some(ApiErrorPayload {
                 code: self.code(),
                 message: self.to_string(),
                 status: self.status_code(),
-                category: self.category().as_str().to_string(),
-                fields: validation_fields(self),
-            },
+                fields,
+            }),
+            meta: ResponseMeta::new(),
         }
     }
 

@@ -1,7 +1,10 @@
 #![no_std]
 
 // ── Core contract modules ─────────────────────────────────────────────────────
-mod errors;
+// #921: errors is the single shared error module — exported publicly so that
+// callers, tests, and integration harnesses can reference Error variants
+// without importing through lib.rs indirection.
+pub mod errors;
 mod events;
 mod types;
 mod validation;

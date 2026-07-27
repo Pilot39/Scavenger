@@ -1,3 +1,22 @@
+// ── Issue #921: Shared error module ──────────────────────────────────────────
+//
+// This file is the **single source of truth** for all error codes in the
+// `stellar-scavngr-contract` crate.
+//
+// Authoring rules:
+//   1. Every new error variant MUST be added here, not in a sub-module.
+//   2. Sub-modules (`participant.rs`, `waste.rs`, `incentive.rs`, etc.) MUST
+//      import errors via `use crate::errors::Error;` — never define their own
+//      contract error enums.
+//   3. Subsystem-specific helper enums (e.g. `CommitmentError`,
+//      `KeyRotationError`) that are **not** Soroban `#[contracterror]` types
+//      may remain local to their module when the subsystem does not surface
+//      errors to external callers.
+//   4. `lib.rs` re-exports `Error` at the crate root via `pub use errors::Error;`.
+//
+// See docs/adr/0004-contract-storage-key-layout.md for the error numbering
+// convention.
+
 use soroban_sdk::contracterror;
 
 /// Typed error codes for the Scavngr contract.
@@ -412,3 +431,120 @@ impl Error {
         self.category() == ErrorCategory::NotFound
     }
 }
+
+// ── Issue #921: Unit tests for the shared error module ───────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Every variant must have a unique numeric discriminant (enforced by the
+    // Soroban SDK, but also verified here as a regression guard).
+    #[test]
+    fn error_codes_are_unique() {
+        let all: &[(u32, Error)] = &[
+            (1,  Error::AlreadyInitialized),
+            (2,  Error::Unauthorized),
+            (3,  Error::NotRegistered),
+            (4,  Error::AlreadyRegistered),
+            (5,  Error::NotManufacturer),
+            (6,  Error::NotWasteOwner),
+            (7,  Error::WasteNotFound),
+            (8,  Error::MaterialNotFound),
+            (9,  Error::IncentiveNotFound),
+            (10, Error::ParticipantNotFound),
+            (11, Error::InvalidAmount),
+            (12, Error::InvalidWeight),
+            (13, Error::InvalidCoordinates),
+            (14, Error::InvalidPercentage),
+            (15, Error::InsufficientBalance),
+            (16, Error::CharityNotSet),
+            (17, Error::TokenAddressNotSet),
+            (18, Error::WasteDeactivated),
+            (19, Error::WasteAlreadyDeactivated),
+            (20, Error::WasteAlreadyConfirmed),
+            (21, Error::WasteNotConfirmed),
+            (22, Error::SelfConfirmation),
+            (23, Error::IncentiveInactive),
+            (24, Error::MaterialNotVerified),
+            (25, Error::WasteTypeMismatch),
+            (26, Error::NoRewardAvailable),
+            (27, Error::InvalidTransferRoute),
+            (28, Error::SameAddress),
+            (29, Error::Overflow),
+            (30, Error::NotCreator),
+            (31, Error::InsufficientBudget),
+            (32, Error::TooManySplits),
+            (33, Error::WeightMismatch),
+            (34, Error::TooFewSplits),
+            (35, Error::TooFewWastes),
+            (36, Error::TooManyWastes),
+            (37, Error::WasteTypeMismatchMerge),
+            (38, Error::LocationMismatch),
+            (39, Error::WasteAlreadyReserved),
+            (40, Error::WasteNotReserved),
+            (41, Error::NotReserver),
+            (42, Error::WasteReservedByOther),
+            (43, Error::InvalidSchedule),
+            (44, Error::WasteExpired),
+            (45, Error::InsufficientCarbonCredits),
+            (46, Error::CarbonListingNotFound),
+            (47, Error::CarbonListingInactive),
+            (48, Error::NotListingSeller),
+            (49, Error::InvalidListing),
+            (50, Error::WasteFrozen),
+            (51, Error::PermissionDenied),
+            (52, Error::InvalidPermission),
+            (53, Error::NoDiscrepancy),
+            (54, Error::ReconciliationThresholdExceeded),
+        ];
+        let codes: alloc::vec::Vec<u32> = all.iter().map(|(n, _)| *n).collect();
+        let mut sorted = codes.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(codes.len(), sorted.len(), "duplicate numeric error codes detected");
+    }
+
+    #[test]
+    fn auth_errors_are_caller_errors() {
+        assert!(Error::Unauthorized.is_caller_error());
+        assert!(Error::NotRegistered.is_caller_error());
+        assert!(Error::PermissionDenied.is_caller_error());
+    }
+
+    #[test]
+    fn not_found_errors_are_classified_correctly() {
+        assert!(Error::WasteNotFound.is_not_found());
+        assert!(Error::ParticipantNotFound.is_not_found());
+        assert!(Error::IncentiveNotFound.is_not_found());
+        assert!(!Error::Overflow.is_not_found());
+    }
+
+    #[test]
+    fn code_strings_contain_category_prefix() {
+        let code = Error::Unauthorized.code();
+        assert!(code.starts_with("AUTH/"), "expected AUTH/ prefix, got {code}");
+
+        let code = Error::InvalidWeight.code();
+        assert!(code.starts_with("INPUT/"), "expected INPUT/ prefix, got {code}");
+
+        let code = Error::WasteNotFound.code();
+        assert!(code.starts_with("NOT_FOUND/"), "expected NOT_FOUND/ prefix, got {code}");
+
+        let code = Error::Overflow.code();
+        assert!(code.starts_with("ARITHMETIC/"), "expected ARITHMETIC/ prefix, got {code}");
+    }
+
+    #[test]
+    fn category_arithmetic_is_not_caller_error() {
+        assert!(!Error::Overflow.is_caller_error());
+    }
+
+    #[test]
+    fn state_errors_are_not_caller_errors() {
+        assert!(!Error::WasteExpired.is_caller_error());
+        assert!(!Error::IncentiveInactive.is_caller_error());
+    }
+}
+
+extern crate alloc;
