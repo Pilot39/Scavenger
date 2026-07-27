@@ -27,6 +27,21 @@ pub mod incentive;
 /// On-chain aggregation helpers for stats and metrics.
 pub mod contract_analytics;
 
+// ── Issue #934: Participant storage consolidation ───────────────────────────
+/// Centralized participant storage helpers, eliminating duplicates and providing
+/// a single source of truth for all participant-related storage operations.
+pub mod participant_storage;
+
+// ── Issue #936: Batch operations gas optimizer ────────────────────────────────
+/// Gas optimization for batch operations through consolidated storage writes.
+/// Reduces per-item gas costs by batching participant updates and waste transfers.
+pub mod batch_optimizer;
+
+// ── Issue #937: Benchmark regression detection ────────────────────────────────
+/// Performance baseline tracking and regression detection system.
+/// Establishes baseline metrics and detects performance degradation over time.
+pub mod benchmark_regression;
+
 // ── Issues #814–#817: new utility modules ────────────────────────────────────
 /// #814 — Reusable event builder pattern, filtering, and formatting utilities.
 pub mod event_builder;
