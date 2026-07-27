@@ -1,6 +1,4 @@
-pub fn validate_coordinates(latitude: i128, longitude: i128) {
-    const MAX_LAT: i128 = 90_000_000;
-    const MAX_LON: i128 = 180_000_000;
+use soroban_sdk::Address;
 //! # Validation Utilities — Issue #757
 //!
 //! Common validation functions extracted into a single reusable module to
@@ -62,10 +60,28 @@ pub const MAX_TAG_LEN: u32 = 32;
 #[allow(dead_code)]
 pub fn validate_positive_amount(amount: i128, field_name: &str) {
     if amount <= 0 {
-        panic!("{} must be positive", field_name);
+        panic!("{} must be greater than zero", field_name);
     }
 }
 
+pub fn validate_positive_u128(amount: u128, field_name: &str) {
+    if amount == 0 {
+        panic!("{} must be greater than zero", field_name);
+    }
+}
+
+/// Validates a waste/material weight: must be non-zero and within `max`.
+pub fn validate_weight(weight: u128, max: u128) {
+    validate_positive_u128(weight, "Waste weight");
+    if weight > max {
+        panic!("Waste weight exceeds maximum allowed");
+    }
+}
+
+/// Validates that two reward-distribution percentages don't sum past 100.
+pub fn validate_percentage_sum(collector_percentage: u32, owner_percentage: u32) {
+    if collector_percentage + owner_percentage > 100 {
+        panic!("Total percentages cannot exceed 100");
 /// Panics if `amount` is not positive (u128 variant, rejects zero).
 ///
 /// # Parameters

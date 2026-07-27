@@ -8,6 +8,14 @@ const WASTE_TRANSFERRED: Symbol = symbol_short!("transfer");
 const WASTE_CONFIRMED: Symbol = symbol_short!("confirmed");
 const PARTICIPANT_REGISTERED: Symbol = symbol_short!("reg");
 const TOKENS_REWARDED: Symbol = symbol_short!("rewarded");
+const PARTICIPANT_LOCATION_UPDATED: Symbol = symbol_short!("loc_upd");
+const ADMIN_TRANSFERRED: Symbol = symbol_short!("adm_xfr");
+const CONTRACT_PAUSED: Symbol = symbol_short!("paused");
+const CONTRACT_UNPAUSED: Symbol = symbol_short!("unpaused");
+const INCENTIVE_UPDATED: Symbol = symbol_short!("inc_upd");
+const BULK_TRANSFER: Symbol = symbol_short!("bulk_xfr");
+const WASTE_CONFIRMATION_RESET: Symbol = symbol_short!("reset");
+const WASTE_DEACTIVATED: Symbol = symbol_short!("deactive");
 const CERTIFICATION_GRANTED: Symbol = symbol_short!("cert_gr");
 const AUCTION_CREATED: Symbol = symbol_short!("auc_cre");
 const BID_PLACED: Symbol = symbol_short!("bid_plc");
@@ -36,10 +44,35 @@ pub fn emit_donation_made(env: &Env, donor: &Address, amount: i128, charity_cont
         .publish((DONATION_MADE, donor), (amount, charity_contract));
 }
 
+/// Emit event when waste is transferred (v1 API — u64 waste ID)
+pub fn emit_waste_transferred(
+    env: &Env,
+    waste_id: u64,
+    from: &Address,
+    to: &Address,
+) {
+    env.events().publish(
+        (WASTE_TRANSFERRED, waste_id),
+        (from, to),
+    );
 /// Emit event when waste is transferred
 pub fn emit_waste_transferred(env: &Env, waste_id: u64, from: &Address, to: &Address) {
     env.events()
         .publish((WASTE_TRANSFERRED, waste_id), (from, to));
+}
+
+/// Emit event when a v2 waste item is transferred (u128 waste ID, includes timestamp)
+pub fn emit_waste_transferred_v2(
+    env: &Env,
+    waste_id: u128,
+    from: &Address,
+    to: &Address,
+    timestamp: u64,
+) {
+    env.events().publish(
+        (WASTE_TRANSFERRED, waste_id),
+        (from, to, timestamp),
+    );
 }
 
 /// Emit event when waste is confirmed by a third party
@@ -86,6 +119,13 @@ pub fn emit_admin_transferred(env: &Env, previous_admin: &Address) {
 
 pub fn emit_waste_expired(env: &Env, waste_id: u128) {
     env.events().publish(
+        (PARTICIPANT_LOCATION_UPDATED, address),
+        (latitude, longitude),
+    );
+}
+
+pub fn emit_admin_transferred(env: &Env, previous_admin: &Address) {
+    env.events().publish((ADMIN_TRANSFERRED,), previous_admin);
         (symbol_short!("expired"), waste_id),
         env.ledger().timestamp(),
     );
@@ -99,11 +139,56 @@ pub fn emit_waste_deactivated(env: &Env, waste_id: u128, admin: &Address) {
 }
 
 pub fn emit_contract_paused(env: &Env, admin: &Address) {
-    env.events().publish((symbol_short!("paused"),), admin);
+    env.events().publish((CONTRACT_PAUSED,), admin);
 }
 
 pub fn emit_contract_unpaused(env: &Env, admin: &Address) {
-    env.events().publish((symbol_short!("unpaused"),), admin);
+    env.events().publish((CONTRACT_UNPAUSED,), admin);
+}
+
+/// Emit event when an incentive's reward points / budget are updated
+pub fn emit_incentive_updated(
+    env: &Env,
+    incentive_id: u64,
+    rewarder: &Address,
+    new_reward_points: u64,
+    new_total_budget: u64,
+) {
+    env.events().publish(
+        (INCENTIVE_UPDATED, incentive_id),
+        (rewarder, new_reward_points, new_total_budget),
+    );
+}
+
+/// Emit event when a collector hands aggregated waste directly to a manufacturer
+pub fn emit_bulk_transfer(
+    env: &Env,
+    waste_id: u128,
+    collector: &Address,
+    manufacturer: &Address,
+    waste_type: WasteType,
+    timestamp: u64,
+) {
+    env.events().publish(
+        (BULK_TRANSFER, waste_id),
+        (collector, manufacturer, waste_type, timestamp),
+    );
+}
+
+/// Emit event when a waste item's confirmation status is reset by its owner
+pub fn emit_waste_confirmation_reset(env: &Env, waste_id: u128, owner: &Address, timestamp: u64) {
+    env.events().publish(
+        (WASTE_CONFIRMATION_RESET, waste_id),
+        (owner, timestamp),
+    );
+}
+
+/// Emit event when a waste item is permanently deactivated
+pub fn emit_waste_deactivated(env: &Env, waste_id: u128, admin: &Address, timestamp: u64) {
+    env.events().publish(
+        (WASTE_DEACTIVATED, waste_id),
+        (admin, timestamp),
+    );
 }
 
 /// Emit event when a waste item is graded

@@ -1,5 +1,6 @@
 use soroban_sdk::{contracttype, Address, String, Symbol};
 
+/// Represents an incentive offered by a manufacturer to encourage recycling
 /// Represents a transfer record in the recycling system
 /// This struct is fully compatible with Soroban storage and implements
 /// deterministic serialization for safe storage and retrieval
@@ -1195,7 +1196,6 @@ impl WasteTransfer {
         }
     }
 }
-
 
 /// Tracks recycling statistics for a participant
 /// Builder pattern for constructing Waste instances
