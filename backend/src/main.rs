@@ -3,6 +3,7 @@ mod middleware;
 mod api;
 mod cache;
 mod compliance;
+mod container;
 mod security;
 mod validation;
 mod search;
@@ -12,18 +13,15 @@ mod rpc;
 use actix_web::{web, App, HttpServer, HttpResponse, HttpRequest, ResponseError};
 use actix_cors::Cors;
 use services::{
-    EmailService, SendGridEmailService, NotificationService, FirebaseNotificationService,
-    ReportService, ReportingService, StorageService, S3StorageService,
-    WebhookManager, ExportService, AuditService, VerificationService, DefaultVerificationService,
-    ArchivalService, FileSystemArchivalStorage,
+    WebhookManager,
 };
 // Removed unused imports: RecommendationEngine, NFTManager, ChainAbstraction (#906)
 use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware, RequestIdMiddleware};
-use cache::{Cache, CacheInvalidationManager};
 use rpc::{StellarRpcClient, StellarRpcConfig};
 use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api, archival as archival_api};
 // analytics API removed — legacy unregistered routes cleaned up (#906)
 use errors::AppError;
+use container::AppContainer;
 use std::sync::Arc;
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
@@ -51,76 +49,37 @@ async fn main() -> std::io::Result<()> {
 
     info!(service = "backend", "Starting Scavenger Backend Server on 0.0.0.0:8080");
 
-    let email_service: Arc<dyn EmailService> = Arc::new(SendGridEmailService::new(
-        std::env::var("SENDGRID_API_KEY").unwrap_or_default(),
-        std::env::var("FROM_EMAIL").unwrap_or_else(|_| "noreply@scavenger.io".to_string()),
-    ));
+    // Build the DI container (#914) — all services are constructed here.
+    let container = AppContainer::from_env()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-    let notification_service = Arc::new(FirebaseNotificationService::new(
-        std::env::var("FIREBASE_PROJECT_ID").unwrap_or_default(),
-    ));
+    // Destructure what the closures below need so we can `.clone()` into each
+    // worker thread without keeping the whole container alive.
+    let email_service      = container.email.clone();
+    let notification_service = container.notification.clone();
+    let reporting_service  = container.reporting.clone();
+    let storage_service    = container.storage.clone();
+    let webhook_manager    = container.webhook.clone();
+    let cache              = container.cache.clone();
+    let cache_invalidation = container.cache_invalidation.clone();
+    let audit_service      = container.audit.clone();
+    let verification_service = container.verification.clone();
+    let search_client      = container.search.clone();
+    let archival_service   = container.archival.clone();
+    let stellar_client     = container.stellar.clone();
 
-    let reporting_service = Arc::new(ReportingService::new(
-        std::env::var("STORAGE_PATH").unwrap_or_else(|_| "/tmp".to_string()),
-    ));
-
-    let storage_service = Arc::new(S3StorageService::new(
-        std::env::var("S3_BUCKET").unwrap_or_default(),
-        std::env::var("AWS_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
-    ));
-
-    let webhook_manager = Arc::new(WebhookManager::new());
-    let rate_limit_config = RateLimitConfig::default();
-    let cache = Cache::new(300);
-    let cache_invalidation = Arc::new(CacheInvalidationManager::new());
-    let audit_service = AuditService::new();
-    let ws_manager = ws::WsConnectionManager::new();
-    let verification_service: Arc<dyn VerificationService> = Arc::new(DefaultVerificationService::new());
-    let csrf_secret = std::env::var("CSRF_SECRET").unwrap_or_else(|_| "change-me-in-production".to_string());
-    let allowed_origins = std::env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "http://localhost:3000".to_string());
-
-    // Initialize Stellar RPC client (#907)
-    let stellar_rpc_config = StellarRpcConfig::from_env();
-    let stellar_client = Arc::new(
-        StellarRpcClient::new(stellar_rpc_config)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?,
-    );
     info!(
         horizon = %stellar_client.horizon_url(),
         contract = %stellar_client.contract_id(),
         "Stellar RPC client ready"
     );
-    
-    // Initialize search client
-    let search_config = search::SearchClientConfig {
-        url: std::env::var("ELASTICSEARCH_URL").unwrap_or_else(|_| "http://localhost:9200".to_string()),
-        username: std::env::var("ELASTICSEARCH_USERNAME").ok(),
-        password: std::env::var("ELASTICSEARCH_PASSWORD").ok(),
-        timeout_seconds: 30,
-        validate_certificates: true,
-    };
-    
-    let search_client = match search::SearchClient::new(search_config) {
-        Ok(client) => {
-            info!("Search client initialized successfully");
-            Arc::new(client)
-        }
-        Err(e) => {
-            tracing::error!("Failed to initialize search client: {}. Search functionality will be limited.", e);
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
-        }
-    };
-    
-    // Initialize archival service
-    let archival_storage_path = std::env::var("ARCHIVAL_STORAGE_PATH")
-        .unwrap_or_else(|_| "/tmp/archives".to_string());
-    let archival_storage = Arc::new(FileSystemArchivalStorage::new(
-        std::path::PathBuf::from(archival_storage_path)
-    ));
-    let archival_service = Arc::new(ArchivalService::new(archival_storage));
-    
-    info!("All services initialized (archival, cache, audit, websocket, verification)");
+    info!("All services initialized via AppContainer (archival, cache, audit, websocket, verification)");
+
+    let rate_limit_config = RateLimitConfig::default();
+    let ws_manager = ws::WsConnectionManager::new();
+    let csrf_secret = std::env::var("CSRF_SECRET").unwrap_or_else(|_| "change-me-in-production".to_string());
+    let allowed_origins = std::env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     HttpServer::new(move || {
         let cors = {
