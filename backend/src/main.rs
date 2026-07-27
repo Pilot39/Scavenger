@@ -18,7 +18,7 @@ use services::{
     ArchivalService, FileSystemArchivalStorage,
 };
 // Removed unused imports: RecommendationEngine, NFTManager, ChainAbstraction (#906)
-use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware, RequestIdMiddleware};
+use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware, RequestIdMiddleware, IdempotencyMiddleware};
 use cache::{Cache, CacheInvalidationManager};
 use rpc::{StellarRpcClient, StellarRpcConfig};
 use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api, archival as archival_api};
@@ -135,6 +135,8 @@ async fn main() -> std::io::Result<()> {
                     actix_web::http::header::CONTENT_TYPE,
                     actix_web::http::header::HeaderName::from_static("x-csrf-token"),
                     actix_web::http::header::HeaderName::from_static("x-session-id"),
+                    // #919: idempotency key header
+                    actix_web::http::header::HeaderName::from_static("idempotency-key"),
                 ])
                 .max_age(3600)
         };
@@ -144,6 +146,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(RateLimitMiddleware::new(rate_limit_config.clone()))
             .wrap(ValidationMiddleware)
             .wrap(RequestIdMiddleware)
+            // #919: idempotency key deduplication for write operations
+            .wrap(IdempotencyMiddleware::new())
             .app_data(web::Data::new(email_service.clone()))
             .app_data(web::Data::new(notification_service.clone()))
             .app_data(web::Data::new(reporting_service.clone()))
