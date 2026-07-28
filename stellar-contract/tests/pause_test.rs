@@ -1,5 +1,8 @@
 #![cfg(test)]
 
+mod common;
+use common::event_helpers::*;
+
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Events},
@@ -157,11 +160,7 @@ fn test_pause_emits_event() {
     let env = Env::default();
     let (client, admin) = setup(&env);
     client.pause(&admin);
-    let events = env.events().all();
-    let found = events.iter().any(|(_, topics, _)| {
-        topics == soroban_sdk::vec![&env, symbol_short!("paused").into_val(&env)]
-    });
-    assert!(found, "paused event not emitted");
+    assert_event_emitted_with_symbol(&env, symbol_short!("paused"));
 }
 
 #[test]
@@ -170,11 +169,7 @@ fn test_unpause_emits_event() {
     let (client, admin) = setup(&env);
     client.pause(&admin);
     client.unpause(&admin);
-    let events = env.events().all();
-    let found = events.iter().any(|(_, topics, _)| {
-        topics == soroban_sdk::vec![&env, symbol_short!("unpaused").into_val(&env)]
-    });
-    assert!(found, "unpaused event not emitted");
+    assert_event_emitted_with_symbol(&env, symbol_short!("unpaused"));
 }
 
 #[test]
