@@ -9,8 +9,9 @@
     "dev": "ts-node src/index.ts",
     "migrate": "node dist/db/migrate.js",
     "test": "jest --runInBand",
-    "test:unit": "jest --runInBand --testPathPattern='tests/(?!integration)'",
+    "test:unit": "jest --runInBand --testPathPattern='tests/(?!integration|migration)'",
     "test:integration": "jest --runInBand --testPathPattern='tests/integration'",
+    "test:migrations": "jest --runInBand --testPathPattern='tests/migration'",
     "test:coverage": "jest --runInBand --coverage",
     "test:watch": "jest --watch"
   },
