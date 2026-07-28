@@ -9,7 +9,10 @@
     "dev": "ts-node src/index.ts",
     "migrate": "node dist/db/migrate.js",
     "test": "jest --runInBand",
-    "test:coverage": "jest --runInBand --coverage"
+    "test:unit": "jest --runInBand --testPathPattern='tests/(?!integration)'",
+    "test:integration": "jest --runInBand --testPathPattern='tests/integration'",
+    "test:coverage": "jest --runInBand --coverage",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "13.1.0",
@@ -30,6 +33,17 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "testMatch": ["**/tests/**/*.test.ts"],
-    "collectCoverageFrom": ["src/**/*.ts"]
+    "collectCoverageFrom": ["src/**/*.ts"],
+    "coverageThreshold": {
+      "global": {
+        "branches": 60,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    },
+    "moduleNameMapper": {
+      "^../src/(.*)$": "<rootDir>/src/$1"
+    }
   }
 }
