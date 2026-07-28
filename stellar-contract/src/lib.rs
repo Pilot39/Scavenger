@@ -52,22 +52,35 @@ pub mod zkp;
 /// #817 — Versioned cryptographic key storage and rotation.
 pub mod key_rotation;
 
+// ── Issue #925: domain-split modules ─────────────────────────────────────────
+/// Admin management: initialization, transfer, multisig proposals, pause/unpause.
+pub mod admin;
+/// Participant registration, role management, location, reputation, leaderboard.
+pub mod participant_mgmt;
+/// Waste lifecycle: submit, recycle, verify, transfer, split, merge, grade, tags.
+pub mod waste_mgmt;
+/// Incentive programs: create, update, schedule, distribute, claim.
+pub mod incentive_mgmt;
+/// Transfer workflows: initiate, approve, reject, expire pending transfers.
+pub mod transfer_mgmt;
+
 // ── Internal test modules (compile-time only) ─────────────────────────────────
 mod test_expiration;
 mod test_grading;
 mod test_transfer_path_validation;
 
 pub use errors::Error;
+// Consolidated, deduplicated pub use block (fixes duplicate symbol exports)
 pub use types::{
-    GlobalMetrics, Incentive, Material, ParticipantRole, RecyclingStats, Waste, WasteTransfer,
-    WasteType,
     Auction, BatchStatus, CarbonListing, CertificationLevel, Challenge, ChallengeProgress,
-    ChallengeStatus, CollectionRoute, ContaminationReport, Dispute, DisputeStatus, GlobalMetrics,
-    GradeRecord, Incentive, LeaderboardEntry, LocationRecord, Material, MaterialComposition,
-    Milestone, OptionalWasteType, ParticipantRole, PendingTransfer, PendingTransferStatus,
-    PermissionAuditEntry, PermissionType, ProcessingRecord, ProcessingStatus, QualityScore,
-    ReconciliationRecord, RecyclingGoal, RecyclingStats, ReputationBadge, RouteStatus,
-    SeasonalMultiplier, TransferItemType, TransferRecord, TransferStatus, Waste, WasteBatch,
+    ChallengeStatus, CollectionRoute, ComplianceReport, ComplianceStatus, ContaminationReport,
+    Dispute, DisputeStatus, GlobalMetrics, GradeRecord, Incentive, LeaderboardEntry,
+    LocationRecord, Material, MaterialComposition, Milestone, OptionalWasteType, ParticipantRole,
+    PendingTransfer, PendingTransferStatus, PerformanceSnapshot, PermissionAuditEntry,
+    PermissionType, ProcessingRecord, ProcessingStatus, QualityScore, ReconciliationRecord,
+    RecyclingGoal, RecyclingStats, RegulatoryValidation, ReportPeriod, ReputationBadge,
+    RouteStatus, SeasonalMultiplier, SubstitutionRecord, TransactionStats, TransferApproval,
+    TransferApprovalStatus, TransferItemType, TransferRecord, TransferStatus, Waste, WasteBatch,
     WasteCertification, WasteGrade, WasteTransfer, WasteType,
 };
 pub use types::calculate_carbon_credits;
@@ -154,6 +167,11 @@ const REPORTS: Symbol = symbol_short!("REPORTS");
 // Issue #703: Performance Benchmarking storage keys
 const TRANSACTION_STATS: Symbol = symbol_short!("TX_STATS");
 const PERF_SNAPSHOTS: Symbol = symbol_short!("PERF_SNP");
+
+// Issue #700: High-value transfer approval storage keys
+const TRANSFER_THRESHOLD: Symbol = symbol_short!("XFR_THRSH");
+const REQUIRED_APPROVERS: Symbol = symbol_short!("REQ_APPR");
+const TRANSFER_APPROVALS: Symbol = symbol_short!("XFR_APPR");
 
 // Reputation delta constants
 const REP_TRANSFER: i128 = 5;
@@ -368,6 +386,7 @@ impl ScavengerContract {
     pub fn transfer_admin(env: Env, current_admin: Address, new_admins: Vec<Address>) {
         // Reentrancy guard
         Self::lock(&env);
+        storage_utils::bump_instance(&env);
         Self::require_admin(&env, &current_admin);
         // Validate new_admins is not empty
         if new_admins.is_empty() {
@@ -390,6 +409,7 @@ impl ScavengerContract {
     pub fn add_admin(env: Env, current_admin: Address, new_admin: Address) {
         // Reentrancy guard
         Self::lock(&env);
+        storage_utils::bump_instance(&env);
         Self::require_admin(&env, &current_admin);
         let mut admins: Vec<Address> = env
             .storage()
@@ -408,6 +428,7 @@ impl ScavengerContract {
     pub fn remove_admin(env: Env, current_admin: Address, admin_to_remove: Address) {
         // Reentrancy guard
         Self::lock(&env);
+        storage_utils::bump_instance(&env);
         Self::require_admin(&env, &current_admin);
         let admins: Vec<Address> = env
             .storage()
@@ -534,17 +555,13 @@ impl ScavengerContract {
 
     // ========== Reentrancy Guard Helper Functions ==========
 
+    /// Prevents self-transfer by ensuring `from` and `to` are different.
+    ///
+    /// # Panics
+    /// - Panics with `"Self-transfer is not allowed"` if `from == to`.
     fn require_addresses_different(from: &Address, to: &Address) {
         validation::validate_addresses_different(from, to, "Self-transfer is not allowed");
-     /// Prevents self-transfer by ensuring the 'from' and 'to' addresses are different.
-     ///
-     /// # Panics
-     /// - Panics with "Self-transfer is not allowed" if `from` equals `to`.
-     fn require_addresses_different(from: &Address, to: &Address) {
-         if from == to {
-             panic!("Self-transfer is not allowed");
-         }
-     }
+    }
 
     /// Apply a reputation delta to a participant (clamped to [REP_MIN, REP_MAX]).
     /// Also updates `last_active_at` so decay timers reset on activity.
@@ -569,6 +586,7 @@ impl ScavengerContract {
     /// - Panics `"Charity address cannot be the same as admin"`.
     /// - Panics `"Caller is not the contract admin"` if `admin` is not the admin.
     pub fn set_charity_contract(env: Env, admin: Address, charity_address: Address) {
+        storage_utils::bump_instance(&env);
         Self::only_admin(&env, &admin);
 
         // Validate address (basic check - address should not be the zero address)
@@ -603,7 +621,7 @@ impl ScavengerContract {
     /// - Panics `"Charity contract not set"` if no charity address is configured.
     pub fn donate_to_charity(env: Env, donor: Address, amount: i128) {
         validation::validate_positive_amount(amount, "Donation amount");
-
+        storage_utils::bump_instance(&env);
         // Reentrancy guard
         Self::lock(&env);
         Self::require_not_paused(&env);
@@ -681,6 +699,7 @@ impl ScavengerContract {
     ) {
         // Reentrancy guard
         Self::lock(&env);
+        storage_utils::bump_instance(&env);
         Self::only_admin(&env, &admin);
 
         validation::validate_percentage_sum(collector_percentage, owner_percentage);
@@ -724,6 +743,7 @@ impl ScavengerContract {
     pub fn set_collector_percentage(env: Env, admin: Address, new_percentage: u32) {
         // Reentrancy guard
         Self::lock(&env);
+        storage_utils::bump_instance(&env);
         Self::only_admin(&env, &admin);
 
         let mut cfg = Self::get_reward_config(&env);
@@ -748,6 +768,7 @@ impl ScavengerContract {
     pub fn set_owner_percentage(env: Env, admin: Address, new_percentage: u32) {
         // Reentrancy guard
         Self::lock(&env);
+        storage_utils::bump_instance(&env);
         Self::only_admin(&env, &admin);
 
         let mut cfg = Self::get_reward_config(&env);
@@ -770,6 +791,7 @@ impl ScavengerContract {
      /// # Errors
      /// - Panics if `min_weight` is greater than MAX_WASTE_WEIGHT.
      pub fn set_min_weight(env: Env, admin: Address, min_weight: u128) {
+         storage_utils::bump_instance(&env);
          Self::only_admin(&env, &admin);
          if min_weight > MAX_WASTE_WEIGHT {
              panic!("Minimum weight cannot exceed maximum allowed weight");
@@ -798,6 +820,7 @@ impl ScavengerContract {
     pub fn set_token_address(env: Env, admin: Address, token_address: Address) {
         // Reentrancy guard
         Self::lock(&env);
+        storage_utils::bump_instance(&env);
         Self::require_admin(&env, &admin);
         env.storage().instance().set(&TOKEN_ADDR, &token_address);
         Self::unlock(&env);
@@ -822,6 +845,7 @@ impl ScavengerContract {
     pub fn set_seasonal_multiplier(env: Env, admin: Address, multiplier: u32, start: u64, end: u64) {
         // Reentrancy guard
         Self::lock(&env);
+        storage_utils::bump_instance(&env);
         Self::require_admin(&env, &admin);
         assert!(multiplier >= 100 && multiplier <= 500, "Multiplier must be between 100 and 500 basis points");
         assert!(start < end, "start must be before end");
@@ -868,7 +892,7 @@ impl ScavengerContract {
 
         // Reentrancy guard
         Self::lock(&env);
-
+        storage_utils::bump_instance(&env);
         rewarder.require_auth();
         Self::require_not_paused(&env);
 
@@ -966,6 +990,7 @@ impl ScavengerContract {
         latitude: i128,
         longitude: i128,
     ) -> Participant {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         address.require_auth();
 
@@ -1102,24 +1127,22 @@ impl ScavengerContract {
 
         let mut total_distributed: u128 = 0;
 
-        // Reward collectors — one read per unique transfer recipient
+        // Reward collectors — one storage read per unique transfer recipient.
+        // Apply cert/tier multipliers once, emit a single event per collector.
         for transfer in transfers.iter() {
             let key = (transfer.to.clone(),);
             let participant: Option<Participant> = env.storage().instance().get(&key);
             if let Some(p) = participant {
                 if matches!(p.role, ParticipantRole::Collector) {
-                    total_distributed = total_distributed
-                        .checked_add(collector_share)
-                        .expect("Overflow in total distributed");
-                    Self::update_participant_stats(env, &transfer.to, 0, collector_share as u64);
-                    events::emit_tokens_rewarded(env, &transfer.to, collector_share, waste_id);
-                    let base_share = collector_share;
+                    // #923: apply multipliers here instead of double-distributing
                     let cert_multiplier = p.certification.reward_multiplier() as u128;
                     let tier_multiplier = p.tier.reward_multiplier() as u128;
-                    let share = (base_share * cert_multiplier * tier_multiplier) / 10000; // Divide by 100*100
-                    total_distributed += share;
-                    Self::update_participant_stats(env, &transfer.to, 0, share as u64);
-                    events::emit_tokens_rewarded(env, &transfer.to, share, waste_id);
+                    let adjusted_share = (collector_share * cert_multiplier * tier_multiplier) / 10000;
+                    total_distributed = total_distributed
+                        .checked_add(adjusted_share)
+                        .expect("Overflow in total distributed");
+                    Self::update_participant_stats(env, &transfer.to, 0, adjusted_share as u64);
+                    events::emit_tokens_rewarded(env, &transfer.to, adjusted_share, waste_id);
                 }
             }
         }
@@ -1584,13 +1607,6 @@ impl ScavengerContract {
             &incentive.rewarder,
             new_reward_points,
             new_total_budget,
-        env.events().publish(
-            (symbol_short!("inc_upd"), incentive_id),
-            (
-                incentive.rewarder.clone(),
-                new_reward_points,
-                new_total_budget,
-            ),
         );
 
         incentive
@@ -1619,7 +1635,7 @@ impl ScavengerContract {
             .expect("Incentive not found");
     pub fn calculate_incentive_reward(env: Env, incentive_id: u64, waste_amount: u64) -> u64 {
         let incentive: Incentive =
-            Self::get_incentive(&env, incentive_id).expect("Incentive not found");
+            Self::get_incentive_internal(&env, incentive_id).expect("Incentive not found");
 
         // Check if incentive is active
         if !incentive.active {
@@ -1628,13 +1644,9 @@ impl ScavengerContract {
 
         // Calculate reward: (weight in kg) * reward_points
         let weight_kg = waste_amount / 1000;
-        let reward = weight_kg
+        weight_kg
             .checked_mul(incentive.reward_points)
-            .expect("Overflow in reward calculation");
-
-        // Exact reward calculation instead of capping
-        reward
-        weight_kg * incentive.reward_points
+            .expect("Overflow in reward calculation")
     }
 
     /// Get all active incentives for a specific waste type, sorted by reward descending.
@@ -1650,12 +1662,11 @@ impl ScavengerContract {
     ) -> soroban_sdk::Vec<Incentive> {
         let mut results: soroban_sdk::Vec<Incentive> = soroban_sdk::Vec::new(&env);
         let count = Self::get_incentive_count(&env);
+        let now = env.ledger().timestamp();
 
         for i in 1..=count {
             if let Some(incentive) = Self::get_incentive_internal(&env, i) {
-                if incentive.waste_type == waste_type && incentive.active {
-            if let Some(incentive) = Self::get_incentive(&env, i) {
-                if incentive.waste_type == waste_type && Self::incentive_in_window(&incentive, env.ledger().timestamp()) {
+                if incentive.waste_type == waste_type && Self::incentive_in_window(&incentive, now) {
                     // Keep results sorted by reward_points descending.
                     let mut inserted = false;
                     for idx in 0..results.len() {
@@ -1691,8 +1702,6 @@ impl ScavengerContract {
 
         for i in 1..=count {
             if let Some(incentive) = Self::get_incentive_internal(&env, i) {
-                if incentive.active {
-            if let Some(incentive) = Self::get_incentive(&env, i) {
                 if Self::incentive_in_window(&incentive, now) {
                     results.push_back(incentive);
                 }
@@ -1785,6 +1794,7 @@ impl ScavengerContract {
     /// - Panics if caller is not admin
     /// - Panics if participant not found
     pub fn grant_certification(env: Env, admin: Address, address: Address, level: CertificationLevel) {
+        storage_utils::bump_instance(&env);
         Self::require_admin(&env, &admin);
 
         let key = (address.clone(),);
@@ -2087,6 +2097,7 @@ impl ScavengerContract {
     /// - Panics `"Participant not found"`.
     /// - Panics `"Participant is not registered"`.
     pub fn update_role(env: Env, address: Address, new_role: ParticipantRole) -> Participant {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         address.require_auth();
 
@@ -2126,6 +2137,7 @@ impl ScavengerContract {
     /// # Errors
     /// - Panics `"Participant not found"`.
     pub fn deregister_participant(env: Env, address: Address) -> Participant {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         address.require_auth();
 
@@ -2175,6 +2187,7 @@ impl ScavengerContract {
         latitude: i128,
         longitude: i128,
     ) -> Participant {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         address.require_auth();
 
@@ -2404,6 +2417,7 @@ impl ScavengerContract {
         description: String,
     ) -> Material {
         // Validate submitter is registered
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         Self::only_registered(&env, &submitter);
 
@@ -2481,6 +2495,7 @@ impl ScavengerContract {
         longitude: i128,
     ) -> u128 {
         // Validate recycler is registered
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         Self::only_registered(&env, &recycler);
 
@@ -2709,6 +2724,7 @@ impl ScavengerContract {
         latitude: i128,
         longitude: i128,
     ) -> Result<WasteTransfer, Error> {
+        storage_utils::bump_instance(&env);
         from.require_auth();
         Self::require_not_paused(&env);
         Self::require_addresses_different(&from, &to);
@@ -2827,6 +2843,7 @@ impl ScavengerContract {
         longitude: i128,
     ) -> Result<Vec<WasteTransfer>, Error> {
         // Validate recipient is registered
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         Self::require_registered(&env, &to);
 
@@ -3074,6 +3091,7 @@ impl ScavengerContract {
     /// - Panics `"Owner cannot confirm own waste"`.
     /// - Panics `"Waste already confirmed"`.
     pub fn confirm_waste_details(env: Env, waste_id: u128, confirmer: Address) -> types::Waste {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         confirmer.require_auth();
         Self::require_registered(&env, &confirmer);
@@ -3128,6 +3146,7 @@ impl ScavengerContract {
     /// - Panics `"Waste is not confirmed"`.
     /// - Panics `"Caller is not the owner of this waste item"`.
     pub fn reset_waste_confirmation(env: Env, waste_id: u128, owner: Address) -> types::Waste {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         // Access control check - verify caller owns the waste
         Self::only_waste_owner(&env, &owner, waste_id);
@@ -3169,6 +3188,7 @@ impl ScavengerContract {
     /// - Panics `"Waste item not found"`.
     /// - Panics `"Waste already deactivated"`.
     pub fn deactivate_waste(env: Env, waste_id: u128, admin: Address) -> types::Waste {
+        storage_utils::bump_instance(&env);
         Self::only_admin(&env, &admin);
 
         let mut waste: types::Waste = env
@@ -3186,7 +3206,6 @@ impl ScavengerContract {
             .instance()
             .set(&("waste_v2", waste_id), &waste);
 
-        events::emit_waste_deactivated(&env, waste_id, &admin, env.ledger().timestamp());
         events::emit_waste_deactivated(&env, waste_id, &admin);
 
         audit_log::AuditLogService::log_action(
@@ -3213,6 +3232,7 @@ impl ScavengerContract {
     /// # Returns
     /// Count of items that were successfully deactivated (`u32`).
     pub fn batch_deactivate_waste(env: Env, waste_ids: Vec<u128>, admin: Address) -> u32 {
+        storage_utils::bump_instance(&env);
         Self::only_admin(&env, &admin);
 
         let mut count: u32 = 0;
@@ -3353,6 +3373,7 @@ impl ScavengerContract {
         materials: soroban_sdk::Vec<(WasteType, u64, String)>,
         submitter: Address,
     ) -> soroban_sdk::Vec<Material> {
+        storage_utils::bump_instance(&env);
         // Validate submitter is registered
         Self::require_not_paused(&env);
         Self::only_registered(&env, &submitter);
@@ -3495,6 +3516,7 @@ impl ScavengerContract {
     /// - Panics `"Only recyclers can verify materials"`.
     /// - Panics `"Material not found"`.
     pub fn verify_material(env: Env, material_id: u64, verifier: Address) -> Material {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         verifier.require_auth();
 
@@ -3586,6 +3608,7 @@ impl ScavengerContract {
         material_ids: soroban_sdk::Vec<u64>,
         verifier: Address,
     ) -> soroban_sdk::Vec<Material> {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         verifier.require_auth();
 
@@ -3928,10 +3951,6 @@ impl ScavengerContract {
         env.storage().instance().get(&("carb_list", listing_id))
     }
 
-    /// Get global contract metrics (total waste count and total tokens earned)
-    pub fn get_metrics(env: Env) -> types::GlobalMetrics {
-        let total_wastes_count: u64 = Self::get_waste_count(&env);
-        let total_tokens_earned: u128 = env
     /// Get all currently-active carbon-credit listings.
     pub fn get_active_carbon_listings(env: Env) -> Vec<CarbonListing> {
         let idx: Vec<u64> = env
@@ -4107,15 +4126,9 @@ impl ScavengerContract {
         assert!(level <= 100, "Contamination level must be 0-100");
         assert!(reason.len() <= 200, "Reason exceeds 200 characters");
 
-        // This function performs external cross-contract calls (the token transfers
-        // below); the lock blocks a reentrant call from distributing the same
-        // incentive budget again before it's decremented.
-        Self::lock(&env);
+        assert!(level <= 100, "Contamination level must be 0-100");
+        assert!(reason.len() <= 200, "Reason exceeds 200 characters");
 
-        let transfers = Self::get_transfer_history(env.clone(), waste_id);
-        let cfg = Self::get_reward_config(&env);
-        let collector_pct = cfg.collector_percentage;
-        let owner_pct = cfg.owner_percentage;
         // Reporter must be registered
         let _participant: Participant = env
             .storage()
@@ -4127,31 +4140,9 @@ impl ScavengerContract {
         let _waste: types::Waste = env
             .storage()
             .instance()
-            .get(&TOKEN_ADDR)
-            .expect("Token address not set");
             .get(&("waste_v2", waste_id))
             .expect("Waste not found");
 
-        let collector_share = total_reward
-            .checked_mul(collector_pct as i128)
-            .expect("Overflow in collector share")
-            / 100;
-        let owner_share = total_reward
-            .checked_mul(owner_pct as i128)
-            .expect("Overflow in owner share")
-            / 100;
-        let mut total_distributed: i128 = 0;
-
-        for transfer in transfers.iter() {
-            let key = (transfer.to.clone(),);
-            if let Some(p) = env.storage().instance().get::<_, Participant>(&key) {
-                if p.role.can_collect_materials() && !p.role.can_manufacture() {
-                    token_client.transfer(&manufacturer, &transfer.to, &collector_share);
-                    Self::update_participant_stats(&env, &transfer.to, 0, collector_share as u64);
-                    events::emit_tokens_rewarded(&env, &transfer.to, collector_share as u128, waste_id);
-                    total_distributed = total_distributed
-                        .checked_add(collector_share)
-                        .expect("Overflow in total distributed");
         let report = types::ContaminationReport {
             waste_id,
             reporter: reporter.clone(),
@@ -4160,18 +4151,6 @@ impl ScavengerContract {
             reported_at: env.ledger().timestamp(),
         };
 
-        // ---- Effects: compute payees and commit all local state before any
-        // external call is made. ----
-        let mut payees: soroban_sdk::Vec<(Address, i128)> = soroban_sdk::Vec::new(&env);
-
-        for transfer in transfers.iter() {
-            let key = (transfer.to.clone(),);
-            if let Some(p) = env.storage().instance().get::<_, Participant>(&key) {
-                if p.role.can_collect_materials() && !p.role.can_manufacture() {
-                    Self::update_participant_stats(&env, &transfer.to, 0, collector_share as u64);
-                    events::emit_tokens_rewarded(&env, &transfer.to, collector_share as u128, waste_id);
-                    total_distributed += collector_share;
-                    payees.push_back((transfer.to.clone(), collector_share));
         // Append report to the list for this waste item
         let reports_key = ("contamination_reports", waste_id);
         let mut reports: Vec<types::ContaminationReport> = env
@@ -4188,7 +4167,7 @@ impl ScavengerContract {
             for r in reports.iter() {
                 levels.push_back(r.level);
             }
-            // Simple sort via selection sort (no std sort in no_std)
+            // Simple selection-sort (no std sort in no_std)
             let n = levels.len();
             for i in 0..n {
                 let mut min_idx = i;
@@ -4205,16 +4184,6 @@ impl ScavengerContract {
             }
             let median = levels.get(n / 2).unwrap();
 
-        Self::update_participant_stats(&env, &material.submitter, 0, owner_share as u64);
-        events::emit_tokens_rewarded(&env, &material.submitter, owner_share as u128, waste_id);
-        total_distributed += owner_share;
-        payees.push_back((material.submitter.clone(), owner_share));
-
-        let recycler_amount = total_reward - total_distributed;
-        if recycler_amount > 0 {
-            Self::update_participant_stats(&env, &material.submitter, 0, recycler_amount as u64);
-            events::emit_tokens_rewarded(&env, &material.submitter, recycler_amount as u128, waste_id);
-            payees.push_back((material.submitter.clone(), recycler_amount));
             let mut waste: types::Waste = env
                 .storage()
                 .instance()
@@ -4243,16 +4212,6 @@ impl ScavengerContract {
         report
     }
 
-        // ---- Interactions: all local state is already committed, so it's now
-        // safe to hand control to the external token contract. ----
-        let token_client = token::Client::new(&env, &token_address);
-        for (payee, amount) in payees.iter() {
-            token_client.transfer(&manufacturer, &payee, &amount);
-        }
-
-        Self::unlock(&env);
-
-        total_reward
     /// Return all contamination reports for a v2 waste item.
     pub fn get_contamination_reports(env: Env, waste_id: u128) -> Vec<types::ContaminationReport> {
         env.storage()
@@ -4382,6 +4341,7 @@ impl ScavengerContract {
         reward_points: u64,
         total_budget: u64,
     ) -> Incentive {
+        storage_utils::bump_instance(&env);
         // Access control check
         Self::require_not_paused(&env);
         Self::only_manufacturer(&env, &rewarder);
@@ -4496,6 +4456,7 @@ impl ScavengerContract {
     /// - Panics `"Incentive not found"`.
     /// - Panics `"Only incentive creator can deactivate"`.
     pub fn deactivate_incentive(env: Env, incentive_id: u64, rewarder: Address) -> Incentive {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         rewarder.require_auth();
         Self::require_registered(&env, &rewarder);
@@ -4524,6 +4485,7 @@ impl ScavengerContract {
         grade: WasteGrade,
         grader: Address,
     ) -> types::Waste {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         grader.require_auth();
         Self::require_registered(&env, &grader);
@@ -5106,8 +5068,9 @@ impl ScavengerContract {
             is_finalized: false,
         };
 
-        // Store report
+        // Store report (bump TTL so it survives beyond instance expiry)
         env.storage().persistent().set(&(REPORTS, new_id), &report);
+        storage_utils::bump_persistent(&env, &(REPORTS, new_id));
 
         // Log the action
         audit_log::AuditLogService::log_action(
@@ -5140,6 +5103,7 @@ impl ScavengerContract {
 
         report.is_finalized = true;
         env.storage().persistent().set(&(REPORTS, report_id), &report);
+        storage_utils::bump_persistent(&env, &(REPORTS, report_id));
 
         audit_log::AuditLogService::log_action(
             &env,
@@ -5405,8 +5369,10 @@ impl ScavengerContract {
                 new_snapshots.push_back(snapshots.get(i).unwrap());
             }
             env.storage().persistent().set(&PERF_SNAPSHOTS, &new_snapshots);
+            storage_utils::bump_persistent(&env, &PERF_SNAPSHOTS);
         } else {
             env.storage().persistent().set(&PERF_SNAPSHOTS, &snapshots);
+            storage_utils::bump_persistent(&env, &PERF_SNAPSHOTS);
         }
     }
 
@@ -5421,6 +5387,7 @@ impl ScavengerContract {
 
     /// Pause the contract (admin only) — blocks all state-changing functions
     pub fn pause(env: Env, admin: Address) {
+        storage_utils::bump_instance(&env);
         Self::require_admin(&env, &admin);
         assert!(
             !env.storage()
@@ -5435,6 +5402,7 @@ impl ScavengerContract {
 
     /// Unpause the contract (admin only)
     pub fn unpause(env: Env, admin: Address) {
+        storage_utils::bump_instance(&env);
         Self::require_admin(&env, &admin);
         assert!(
             env.storage()
@@ -5476,6 +5444,7 @@ impl ScavengerContract {
         incentive_id: u64,
         manufacturer: Address,
     ) -> i128 {
+        storage_utils::bump_instance(&env);
         manufacturer.require_auth();
 
         let material = Self::get_waste_internal(&env, waste_id).expect("Material not found");
@@ -6820,7 +6789,7 @@ impl ScavengerContract {
         Self::require_not_paused(&env);
 
         let mut incentive: Incentive =
-            Self::get_incentive(&env, incentive_id).expect("Incentive not found");
+            Self::get_incentive_internal(&env, incentive_id).expect("Incentive not found");
 
         if incentive.rewarder != rewarder {
             return Err(Error::NotCreator);
@@ -7290,6 +7259,7 @@ impl ScavengerContract {
         waste_id: u128,
         reason: String,
     ) -> Dispute {
+        storage_utils::bump_instance(&env);
         Self::require_not_paused(&env);
         Self::only_registered(&env, &disputer);
 
@@ -8053,6 +8023,7 @@ impl ScavengerContract {
         subject: Address,
         permission: u32,
     ) -> Result<(), Error> {
+        storage_utils::bump_instance(&env);
         admin.require_auth();
         Self::check_admin(&env, &admin)?;
 
@@ -8102,6 +8073,7 @@ impl ScavengerContract {
         subject: Address,
         permission: u32,
     ) -> Result<(), Error> {
+        storage_utils::bump_instance(&env);
         admin.require_auth();
         Self::check_admin(&env, &admin)?;
 
@@ -8198,6 +8170,7 @@ impl ScavengerContract {
         reconciler: Address,
         reason: String,
     ) -> Result<ReconciliationRecord, Error> {
+        storage_utils::bump_instance(&env);
         reconciler.require_auth();
         Self::require_not_paused(&env);
 
