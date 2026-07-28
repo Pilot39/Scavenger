@@ -4,6 +4,8 @@
 //! Direct `reqwest` calls in handlers are not permitted.
 
 pub mod client;
+#[cfg(test)]
+mod error_injection_tests;
 
 pub use client::{
     ContractDataEntry, LatestLedger, RetryConfig, RpcError, StellarAccount, StellarRpcClient,
