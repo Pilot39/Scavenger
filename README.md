@@ -174,3 +174,20 @@ Pull requests must pass all CI checks before merging. Configure branch protectio
 ## License
 
 MIT License - see LICENSE file for details
+
+## Configuration
+
+### TypeScript
+- Base config: `tsconfig.base.json`
+- Extended by each package
+- See `backend/tsconfig.json`, `frontend/tsconfig.json`, `indexer/tsconfig.json`
+
+### ESLint
+- Base config: `eslint.config.base.js`
+- Extended by each package
+- See `backend/eslint.config.js`, `frontend/eslint.config.js`, `indexer/eslint.config.js`
+
+### Adding a New Package
+1. Copy the `tsconfig.json` and `eslint.config.js` from an existing package
+2. Update the extends path if needed
+3. Add package-specific overrides
