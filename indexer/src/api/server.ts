@@ -1,9 +1,10 @@
 import http from 'http';
 import { logger } from '../utils/logger';
-import { handleHealth, handleMetrics } from '../controllers/healthController';
+import { handleHealth, handleLiveness, handleReadiness, handleMetrics } from '../controllers/healthController';
 import { handleEventQuery, handleEventStream } from '../controllers/eventController';
 import { handleReplay, handleReplayStatus } from '../controllers/replayController';
 import { handleAlertQuery } from '../controllers/alertController';
+import { handleListParticipants, handleGetParticipant } from '../controllers/participantController';
 
 export interface ApiConfig {
   port: number;
@@ -40,18 +41,27 @@ export function createApiServer(config: ApiConfig) {
 
       if (path === '/health') {
         handleHealth(req, res);
+      } else if (path === '/health/liveness') {
+        handleLiveness(req, res);
+      } else if (path === '/health/readiness') {
+        await handleReadiness(req, res);
       } else if (path === '/metrics') {
         handleMetrics(req, res, metrics);
-      } else if (path.startsWith('/events')) {
-        await handleEventQuery(req, res, url);
       } else if (path === '/events/stream') {
         handleEventStream(req, res, sseClients);
+      } else if (path.startsWith('/events')) {
+        await handleEventQuery(req, res, url);
       } else if (path === '/replay') {
         await handleReplay(req, res);
       } else if (path.startsWith('/replay/status')) {
         await handleReplayStatus(req, res);
       } else if (path.startsWith('/alerts')) {
         await handleAlertQuery(req, res, url);
+      } else if (path === '/participants') {
+        await handleListParticipants(req, res, url);
+      } else if (path.startsWith('/participants/')) {
+        const address = path.slice('/participants/'.length);
+        await handleGetParticipant(req, res, decodeURIComponent(address));
       } else {
         res.writeHead(404);
         res.end(JSON.stringify({ error: 'Not found' }));

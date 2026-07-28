@@ -49,6 +49,11 @@ export class JobQueue {
     this.processors.set(jobType, processor);
   }
 
+  /** Returns the set of job types that have a registered processor. */
+  getRegisteredJobTypes(): string[] {
+    return Array.from(this.processors.keys());
+  }
+
   async enqueue(
     type: string,
     data: any,
