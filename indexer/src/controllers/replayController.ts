@@ -1,5 +1,6 @@
 import http from 'http';
 import { startReplay } from '../services/replayService';
+import { validateReplayBody, RequestValidationError } from '../validation';
 
 export async function handleReplay(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -11,19 +12,26 @@ export async function handleReplay(req: http.IncomingMessage, res: http.ServerRe
   let body = '';
   for await (const chunk of req) body += chunk;
 
+  let parsed: Record<string, unknown>;
   try {
-    const { fromLedger, toLedger, eventTypes } = JSON.parse(body);
-    if (typeof fromLedger !== 'number') {
-      res.writeHead(400);
-      res.end(JSON.stringify({ error: 'fromLedger is required' }));
-      return;
-    }
+    parsed = JSON.parse(body);
+  } catch {
+    res.writeHead(400);
+    res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+    return;
+  }
 
-    const result = await startReplay({ fromLedger, toLedger, eventTypes });
-
+  try {
+    const validated = validateReplayBody(parsed);
+    const result = await startReplay(validated);
     res.writeHead(202);
     res.end(JSON.stringify(result));
   } catch (err) {
+    if (err instanceof RequestValidationError) {
+      res.writeHead(400);
+      res.end(JSON.stringify(err.toResponse()));
+      return;
+    }
     res.writeHead(400);
     res.end(JSON.stringify({ error: String(err) }));
   }
