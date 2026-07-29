@@ -8,7 +8,6 @@ import {
   TransactionBuilder,
   BASE_FEE,
 } from '@stellar/stellar-sdk'
-import { signTransaction } from '@stellar/freighter-api'
 import {
   Role,
   WasteType,
@@ -21,6 +20,7 @@ import {
   GlobalMetrics,
   ContractError,
 } from './types'
+import { signTransactionXDR } from '@/lib/wallet'
 
 export interface ClientOptions {
   rpcUrl: string
@@ -81,11 +81,7 @@ export class ScavengerClient {
 
     const assembled = SorobanRpc.assembleTransaction(tx, sim).build()
 
-    const signResult = await signTransaction(assembled.toXDR(), {
-      networkPassphrase: this.networkPassphrase,
-    })
-    const signedTxXdr = typeof signResult === 'string' ? signResult : (signResult as { signedTxXdr: string }).signedTxXdr
-
+    const signedTxXdr = await signTransactionXDR(assembled.toXDR(), this.networkPassphrase)
     const signed = TransactionBuilder.fromXDR(signedTxXdr, this.networkPassphrase)
     const sendResult = await this.server.sendTransaction(signed)
 

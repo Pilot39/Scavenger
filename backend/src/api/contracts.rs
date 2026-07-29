@@ -1,10 +1,12 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-use crate::cache::Cache;
+use crate::cache::{Cache, CacheInvalidationManager, InvalidationEvent};
+use crate::cache::ttl::{CacheTtl, keys as cache_keys};
 use crate::services::api::{ApiBuilder, PaginatedResponse};
-use crate::validation::{validate_pagination, ValidationError};
+use crate::validation::{error_response, validate_pagination};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasteResponse {
@@ -70,16 +72,6 @@ fn now() -> String {
     Utc::now().to_rfc3339()
 }
 
-fn error_response(errors: Vec<ValidationError>) -> HttpResponse {
-    HttpResponse::BadRequest().json(ApiBuilder::error_response::<String>(
-        errors
-            .iter()
-            .map(|e| format!("{}: {}", e.field, e.message))
-            .collect::<Vec<_>>()
-            .join("; "),
-    ))
-}
-
 fn query_string(req: &HttpRequest) -> String {
     let qs = req.query_string();
     if qs.is_empty() {
@@ -99,10 +91,10 @@ pub async fn list_wastes(
 
     let errors = validate_pagination(page, limit);
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
-    let cache_key = format!("contract:wastes:{}", query_string(&req));
+    let cache_key = cache_keys::waste_list(&query_string(&req));
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<PaginatedResponse<WasteResponse>>(&cached) {
             return HttpResponse::Ok()
@@ -175,7 +167,7 @@ pub async fn list_wastes(
 
     let response = ApiBuilder::paginated_response(page_items, total, page, limit);
     if let Ok(json) = serde_json::to_vec(&response) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::WasteList.duration());
     }
 
     HttpResponse::Ok()
@@ -188,7 +180,7 @@ pub async fn get_waste(
     path: web::Path<String>,
 ) -> HttpResponse {
     let waste_id = path.into_inner();
-    let cache_key = format!("contract:waste:{}", waste_id);
+    let cache_key = cache_keys::waste_item(&waste_id);
 
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<WasteResponse>(&cached) {
@@ -210,7 +202,7 @@ pub async fn get_waste(
     };
 
     if let Ok(json) = serde_json::to_vec(&waste) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::WasteItem.duration());
     }
 
     HttpResponse::Ok()
@@ -228,10 +220,10 @@ pub async fn list_participants(
 
     let errors = validate_pagination(page, limit);
     if !errors.is_empty() {
-        return error_response(errors);
+        return error_response(&errors);
     }
 
-    let cache_key = format!("contract:participants:{}", query_string(&req));
+    let cache_key = cache_keys::participant_list(&query_string(&req));
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) =
             serde_json::from_slice::<PaginatedResponse<ParticipantResponse>>(&cached)
@@ -287,7 +279,7 @@ pub async fn list_participants(
 
     let response = ApiBuilder::paginated_response(page_items, total, page, limit);
     if let Ok(json) = serde_json::to_vec(&response) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::ParticipantList.duration());
     }
 
     HttpResponse::Ok()
@@ -300,7 +292,7 @@ pub async fn get_participant(
     path: web::Path<String>,
 ) -> HttpResponse {
     let participant_id = path.into_inner();
-    let cache_key = format!("contract:participant:{}", participant_id);
+    let cache_key = cache_keys::participant_item(&participant_id);
 
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<ParticipantResponse>(&cached) {
@@ -320,7 +312,7 @@ pub async fn get_participant(
     };
 
     if let Ok(json) = serde_json::to_vec(&participant) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::ParticipantItem.duration());
     }
 
     HttpResponse::Ok()
@@ -329,7 +321,7 @@ pub async fn get_participant(
 }
 
 pub async fn get_contract_stats(cache: web::Data<Cache>) -> HttpResponse {
-    let cache_key = "contract:stats".to_string();
+    let cache_key = cache_keys::CONTRACT_STATS.to_string();
 
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<ContractStatsResponse>(&cached) {
@@ -349,7 +341,7 @@ pub async fn get_contract_stats(cache: web::Data<Cache>) -> HttpResponse {
     };
 
     if let Ok(json) = serde_json::to_vec(&stats) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::ContractStats.duration());
     }
 
     HttpResponse::Ok()
@@ -358,7 +350,7 @@ pub async fn get_contract_stats(cache: web::Data<Cache>) -> HttpResponse {
 }
 
 pub async fn get_contract_info(cache: web::Data<Cache>) -> HttpResponse {
-    let cache_key = "contract:info".to_string();
+    let cache_key = cache_keys::CONTRACT_INFO.to_string();
 
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<ContractInfoResponse>(&cached) {
@@ -377,7 +369,7 @@ pub async fn get_contract_info(cache: web::Data<Cache>) -> HttpResponse {
     };
 
     if let Ok(json) = serde_json::to_vec(&info) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::ContractInfo.duration());
     }
 
     HttpResponse::Ok()
@@ -385,24 +377,70 @@ pub async fn get_contract_info(cache: web::Data<Cache>) -> HttpResponse {
         .json(ApiBuilder::success_response(info))
 }
 
+/// Invalidate the cache for a specific waste record and all related list pages.
+/// Also fires an [`InvalidationEvent::WasteUpdated`] through the invalidation manager.
 pub async fn invalidate_waste_cache(
     cache: web::Data<Cache>,
+    invalidation: web::Data<Arc<CacheInvalidationManager>>,
     path: web::Path<String>,
 ) -> HttpResponse {
     let waste_id = path.into_inner();
-    cache.invalidate(&format!("contract:waste:{}", waste_id));
-    HttpResponse::Ok().json(ApiBuilder::success_response("cache invalidated"))
+    let event = InvalidationEvent::WasteUpdated(waste_id.clone());
+    let strategies = invalidation.generate_invalidation_strategy(&event, &cache);
+    for strategy in &strategies {
+        invalidation.apply_strategy(strategy, &cache);
+    }
+    // Always invalidate the exact item key too
+    cache.invalidate(&cache_keys::waste_item(&waste_id));
+    // Invalidate all list pages containing waste
+    cache.invalidate_pattern(cache_keys::WASTE_PATTERN);
+
+    HttpResponse::Ok().json(ApiBuilder::success_response(serde_json::json!({
+        "invalidated": waste_id,
+        "strategies_applied": strategies.len(),
+    })))
 }
 
-pub async fn invalidate_all_cache(cache: web::Data<Cache>) -> HttpResponse {
+/// Invalidate the entire cache (all contract keys).
+pub async fn invalidate_all_cache(
+    cache: web::Data<Cache>,
+    invalidation: web::Data<Arc<CacheInvalidationManager>>,
+) -> HttpResponse {
+    let event = InvalidationEvent::GlobalInvalidation;
+    let strategies = invalidation.generate_invalidation_strategy(&event, &cache);
+    for strategy in &strategies {
+        invalidation.apply_strategy(strategy, &cache);
+    }
+    // Fallback: wipe everything not caught by pattern
     cache.clear();
-    HttpResponse::Ok().json(ApiBuilder::success_response("all cache invalidated"))
+
+    HttpResponse::Ok().json(ApiBuilder::success_response(serde_json::json!({
+        "invalidated": "all",
+        "strategies_applied": strategies.len(),
+    })))
+}
+
+/// Return cache metrics for observability.
+pub async fn cache_metrics(cache: web::Data<Cache>) -> HttpResponse {
+    let metrics = cache.get_metrics();
+    HttpResponse::Ok().json(ApiBuilder::success_response(serde_json::json!({
+        "hits": metrics.hits,
+        "misses": metrics.misses,
+        "evictions": metrics.evictions,
+        "total_requests": metrics.total_requests,
+        "hit_rate": metrics.hit_rate(),
+        "cache_size": cache.len(),
+    })))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use actix_web::test;
+
+    fn make_invalidation() -> web::Data<Arc<CacheInvalidationManager>> {
+        web::Data::new(Arc::new(CacheInvalidationManager::new()))
+    }
 
     #[actix_web::test]
     async fn test_list_wastes_default_pagination() {
@@ -486,6 +524,52 @@ mod tests {
                 .get("X-Cache")
                 .and_then(|v| v.to_str().ok()),
             Some("HIT")
+        );
+    }
+
+    #[actix_web::test]
+    async fn test_invalidate_waste_cache() {
+        let cache = Cache::new(60);
+        let inv = make_invalidation();
+
+        // Prime the cache
+        let _ = get_waste(web::Data::new(cache.clone()), web::Path::from("w1".to_string())).await;
+        assert!(cache.get(&cache_keys::waste_item("w1")).is_some());
+
+        // Invalidate
+        let resp = invalidate_waste_cache(web::Data::new(cache.clone()), inv, web::Path::from("w1".to_string())).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+        assert!(cache.get(&cache_keys::waste_item("w1")).is_none());
+    }
+
+    #[actix_web::test]
+    async fn test_invalidate_all_cache() {
+        let cache = Cache::new(60);
+        let inv = make_invalidation();
+        cache.set("contract:stats".to_string(), b"test".to_vec());
+        let resp = invalidate_all_cache(web::Data::new(cache.clone()), inv).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+        assert!(cache.get("contract:stats").is_none());
+    }
+
+    #[actix_web::test]
+    async fn test_cache_metrics_endpoint() {
+        let cache = Cache::new(60);
+        let _ = get_contract_stats(web::Data::new(cache.clone())).await;
+        let _ = get_contract_stats(web::Data::new(cache.clone())).await;
+        let resp = cache_metrics(web::Data::new(cache)).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+    }
+
+    #[test]
+    fn test_per_endpoint_ttl_differences() {
+        assert!(
+            CacheTtl::WasteItem.duration() < CacheTtl::ContractStats.duration(),
+            "Waste items should expire faster than aggregate stats"
+        );
+        assert!(
+            CacheTtl::ContractStats.duration() < CacheTtl::ContractInfo.duration(),
+            "Stats should expire faster than near-static contract info"
         );
     }
 }

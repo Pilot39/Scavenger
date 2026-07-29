@@ -2,6 +2,7 @@ import { Award, Trophy, Star, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { useAppTitle } from '@/hooks/useAppTitle'
+import { ContributorRecognition } from '@/components/community/ContributorRecognition'
 
 interface LeaderboardEntry {
   rank: number
@@ -195,6 +196,12 @@ export function CommunityPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Contributor Recognition Program */}
+      <div>
+        <h2 className="mb-4 text-xl font-semibold">Contributor Recognition Program</h2>
+        <ContributorRecognition />
       </div>
     </div>
   )

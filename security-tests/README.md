@@ -15,13 +15,14 @@ This directory contains security tests covering:
 
 ## Setup
 
-### Prerequisites
+Base environment setup (Node.js, Docker, running services) is in the canonical guide:
 
-- Node.js 18+
-- OWASP ZAP (optional, for automated scanning)
-- curl or Postman for API testing
+➡️ **[Developer Onboarding Guide](../docs/DEVELOPER_ONBOARDING.md#development-environment-setup)**
 
-### Installation
+Additional tools for this suite only:
+
+- OWASP ZAP — optional, for automated scanning
+- curl or Postman — for manual API probing
 
 ```bash
 npm install

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { runMigrations } from './db/migrate';
+import { closePool } from './db/client';
 import { runIndexer } from './indexer';
 import { createApiServer } from './api/server';
 import { startAlertChecker, createAlertHistoryTable } from './monitoring/alerts';
@@ -25,6 +26,29 @@ async function main() {
   await api.start();
 
   startAlertChecker();
+
+  /**
+   * Graceful shutdown handler.
+   * Stops the API server (drains SSE connections), closes the DB pool,
+   * then exits cleanly.  The indexer's own SIGTERM handler (in indexer.ts)
+   * clears its polling interval; we call closePool() here so the DB is
+   * released regardless of which signal fires first.
+   */
+  async function shutdown(signal: string) {
+    logger.info('Shutdown initiated', { signal });
+    try {
+      await api.stop();
+      await closePool();
+      logger.info('Graceful shutdown complete');
+    } catch (err) {
+      logger.error('Error during shutdown', { error: String(err) });
+    } finally {
+      process.exit(0);
+    }
+  }
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT',  () => shutdown('SIGINT'));
 
   await runIndexer(
     {

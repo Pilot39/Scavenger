@@ -1,51 +1,43 @@
-# Performance Testing Configuration
+# Performance Testing Infrastructure
 
-## k6 Load Testing
+This directory contains the performance testing suite for Scavenger.
 
-### Setup
+## Framework
+We use [k6](https://k6.io/) for load, stress, and endurance testing.
+
+## Directory Structure
+- `scenarios/`: k6 test scripts for different testing types (load, stress, endurance).
+- `lib/`: Shared functions and configurations.
+- `baselines/`: Performance baseline data for regression detection.
+- `reports/`: Generated test results and summary reports.
+
+## Test Types
+1. **Load Test** (`load.js`): Tests the system under expected normal load.
+2. **Stress Test** (`stress.js`): Tests the system's limits by gradually increasing load until it breaks or reaches a high threshold.
+3. **Endurance Test** (`endurance.js`): Tests system stability over an extended period.
+
+## Running Tests
+
+Requires a running environment (see the
+[Developer Onboarding Guide](../docs/DEVELOPER_ONBOARDING.md#development-environment-setup))
+plus [k6](https://k6.io) installed locally.
+
+To run the full suite:
 ```bash
-# Install k6
-brew install k6  # macOS
-# or
-sudo apt-get install k6  # Linux
+./performance/run-perf-tests.sh
 ```
 
-### Running Tests
-
-**Local Development:**
+To run a specific test:
 ```bash
-k6 run performance/k6-load-test.js
+k6 run performance/scenarios/load.js
 ```
 
-**Against Testnet:**
-```bash
-BASE_URL=https://testnet-rpc.example.com k6 run performance/k6-load-test.js
-```
+## Baselines and Alerts
+The suite includes a baseline comparison tool.
+- To generate a new baseline: `GENERATE_BASELINE=true ./performance/run-perf-tests.sh`
+- The `analyze-results.js` script automatically compares current results with the baseline and reports regressions.
 
-**With Custom Configuration:**
-```bash
-k6 run \
-  --vus 100 \
-  --duration 5m \
-  --rps 1000 \
-  performance/k6-load-test.js
-```
-
-### Performance Budgets
-
-- API Response Time (p95): < 500ms
-- Contract Call Duration (p95): < 1000ms
-- Error Rate: < 10%
-- Throughput: > 100 requests/second
-
-### Metrics Tracked
-
-- `api_duration` - HTTP request duration
-- `contract_call_duration` - Smart contract execution time
-- `errors` - Error rate
-- `success_count` - Successful operations
-- `failure_count` - Failed operations
-
-### CI/CD Integration
-
-Performance tests run on every push to `develop` and `main` branches. Results are compared against baseline thresholds.
+## Metrics Tracked
+- `http_req_duration`: End-to-end request time (p95, avg).
+- `errors`: Rate of non-200/409 responses.
+- `api_duration`: Custom trend for API specific timing.

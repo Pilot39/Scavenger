@@ -125,7 +125,24 @@ export default defineConfig({
         globals: true,
         environment: 'jsdom',
         setupFiles: ['./src/test/setup.tsx'],
-        css: false
+        css: false,
+        coverage: {
+          provider: 'v8',
+          reporter: ['text', 'json', 'html', 'lcov'],
+          include: ['src/**/*.{ts,tsx}'],
+          exclude: [
+            'src/**/*.d.ts',
+            'src/**/*.test.{ts,tsx}',
+            'src/**/*.spec.{ts,tsx}',
+            'src/test/**',
+            'src/**/*.stories.tsx',
+          ],
+          lines: 85,
+          functions: 85,
+          branches: 85,
+          statements: 85,
+          perFile: true,
+        },
       }
     }, {
       extends: true,

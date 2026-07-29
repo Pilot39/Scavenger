@@ -51,7 +51,6 @@ class Logger {
     if (this.shouldLog('debug')) {
       const entry = this.createEntry('debug', message, context);
       this.logs.push(entry);
-      if (this.enableConsole) console.debug(this.formatEntry(entry));
     }
   }
 
@@ -59,7 +58,6 @@ class Logger {
     if (this.shouldLog('info')) {
       const entry = this.createEntry('info', message, context);
       this.logs.push(entry);
-      if (this.enableConsole) console.info(this.formatEntry(entry));
     }
   }
 

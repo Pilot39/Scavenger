@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Newspaper, Recycle, Package, Wrench, GlassWater,
   Leaf, Cpu, LocateFixed, Search, ChevronDown, Loader2
@@ -11,6 +12,7 @@ import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { wasteSubmissionSchema } from '@/lib/validation/wasteSubmission'
 
 type WeightUnit = 'grams' | 'kilograms'
 
@@ -48,6 +50,8 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  const schema = useMemo(() => wasteSubmissionSchema(weightUnit), [weightUnit])
+
   const {
     register,
     handleSubmit,
@@ -62,6 +66,7 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
     longitude: string
     notes: string
   }>({
+    resolver: zodResolver(schema),
     defaultValues: {
       wasteType: '',
       weight: '',
@@ -171,7 +176,6 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
             <Controller
               name="wasteType"
               control={control}
-              rules={{ validate: (v) => v !== '' || 'Material type is required' }}
               render={({ field }) => (
                 <div className="relative">
                   <button
@@ -276,19 +280,7 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
                 step="any"
                 min="0"
                 placeholder={weightUnit === 'grams' ? 'e.g. 500' : 'e.g. 0.5'}
-                {...register('weight', {
-                  required: 'Weight is required',
-                  validate: (v) => {
-                    const num = parseFloat(v)
-                    if (isNaN(num) || num < 1) {
-                      if (weightUnit === 'kilograms') {
-                        return num >= 0.001 || 'Minimum weight is 0.001 kg (1 gram)'
-                      }
-                      return 'Minimum weight is 1 gram'
-                    }
-                    return true
-                  },
-                })}
+                {...register('weight')}
               />
               <button
                 type="button"
@@ -319,11 +311,7 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
                   step="0.000001"
                   placeholder="Latitude"
                   aria-label="Latitude"
-                  {...register('latitude', {
-                    required: 'Latitude is required',
-                    min: { value: -90, message: 'Latitude must be between -90 and 90' },
-                    max: { value: 90, message: 'Latitude must be between -90 and 90' },
-                  })}
+                  {...register('latitude')}
                 />
                 {errors.latitude && (
                   <p className="mt-1 text-sm text-destructive" role="alert">{errors.latitude.message}</p>
@@ -335,11 +323,7 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
                   step="0.000001"
                   placeholder="Longitude"
                   aria-label="Longitude"
-                  {...register('longitude', {
-                    required: 'Longitude is required',
-                    min: { value: -180, message: 'Longitude must be between -180 and 180' },
-                    max: { value: 180, message: 'Longitude must be between -180 and 180' },
-                  })}
+                  {...register('longitude')}
                 />
                 {errors.longitude && (
                   <p className="mt-1 text-sm text-destructive" role="alert">{errors.longitude.message}</p>

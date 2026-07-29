@@ -123,4 +123,14 @@ module.exports = {
       version: 'detect'
     }
   }
+    'no-console': ['error', { allow: ['warn', 'error'] }]
+  },
+  overrides: [
+    {
+      files: ['*.stories.tsx', '*.stories.ts'],
+      rules: {
+        'no-console': 'off'
+      }
+    }
+  ]
 }

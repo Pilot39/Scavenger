@@ -1,9 +1,26 @@
+use actix_web::{HttpResponse, ResponseError};
 use serde::{Deserialize, Serialize};
+
+use crate::errors::{AppError, FieldError, ValidationError as DomainValidationError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationError {
     pub field: String,
     pub message: String,
+}
+
+/// Builds the unified JSON error response for a list of field-level validation
+/// errors. Shared by API handlers instead of each module defining its own
+/// `error_response` helper.
+pub fn error_response(errors: &[ValidationError]) -> HttpResponse {
+    let fields = errors
+        .iter()
+        .map(|e| FieldError {
+            field: e.field.clone(),
+            message: e.message.clone(),
+        })
+        .collect();
+    AppError::Validation(DomainValidationError::Multiple(fields)).error_response()
 }
 
 /// Collects multiple validation errors and serializes them for API responses.

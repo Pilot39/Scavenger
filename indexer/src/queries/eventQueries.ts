@@ -64,6 +64,35 @@ export async function queryEvents(filter: EventFilter): Promise<EventQueryResult
   return { events: rows, total, limit, offset };
 }
 
+export interface ReplayFilter {
+  fromLedger: number;
+  toLedger?: number;
+  eventTypes?: string[];
+}
+
+export async function queryEventsForReplay(filter: ReplayFilter): Promise<Record<string, unknown>[]> {
+  const pool = getPool();
+  let sql = 'SELECT * FROM raw_events WHERE ledger_sequence >= $1';
+  const params: unknown[] = [filter.fromLedger];
+  let paramIdx = 2;
+
+  if (filter.toLedger !== undefined) {
+    sql += ` AND ledger_sequence <= $${paramIdx++}`;
+    params.push(filter.toLedger);
+  }
+  if (filter.eventTypes && filter.eventTypes.length > 0) {
+    sql += ` AND event_type = ANY($${paramIdx++})`;
+    params.push(filter.eventTypes);
+  }
+  sql += ' ORDER BY ledger_sequence ASC, id ASC';
+
+  const t = Date.now();
+  const { rows } = await pool.query(sql, params);
+  recordQueryMetric(sql, Date.now() - t, rows.length);
+
+  return rows;
+}
+
 export async function queryEventTypes(): Promise<string[]> {
   const pool = getPool();
   const querySql = 'SELECT DISTINCT event_type FROM raw_events ORDER BY event_type';

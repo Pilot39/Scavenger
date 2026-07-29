@@ -1,12 +1,6 @@
-import { UseFormRegister, UseFormSetValue } from 'react-hook-form';
-import { WasteType } from '@/api/types';
-import { Newspaper, Recycle, Package, Wrench, GlassWater } from 'lucide-react';
-
-interface WasteTypeStepProps {
-  register: UseFormRegister<any>;
-  formData: any;
-  setValue: UseFormSetValue<any>;
-}
+import { WasteType } from '@/api/types'
+import { Newspaper, Recycle, Package, Wrench, GlassWater } from 'lucide-react'
+import { WasteTypeStepProps } from '../types'
 
 const WASTE_TYPES: { value: WasteType; label: string; icon: React.ReactNode }[] = [
   { value: WasteType.Paper, label: 'Paper', icon: <Newspaper className="h-5 w-5" /> },
