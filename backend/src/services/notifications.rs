@@ -48,15 +48,9 @@ pub trait NotificationService: Send + Sync {
         device_token: &str,
         notification: PushNotification,
     ) -> Result<String, NotificationError>;
-    async fn set_preferences(
-        &self,
-        preference: NotificationPreference,
-    ) -> Result<(), NotificationError>;
+    async fn set_preferences(&self, preference: NotificationPreference) -> Result<(), NotificationError>;
     async fn get_preferences(&self, user_id: &str) -> Result<NotificationPreference, NotificationError>;
-    async fn schedule_notification(
-        &self,
-        scheduled: ScheduledNotification,
-    ) -> Result<String, NotificationError>;
+    async fn schedule_notification(&self, scheduled: ScheduledNotification) -> Result<String, NotificationError>;
 }
 
 pub struct FirebaseNotificationService {
@@ -82,9 +76,7 @@ impl NotificationService for FirebaseNotificationService {
         self.validate_token(&token.token)?;
 
         if token.user_id.is_empty() {
-            return Err(NotificationError::InvalidToken(
-                "Empty user_id".to_string(),
-            ));
+            return Err(NotificationError::InvalidToken("Empty user_id".to_string()));
         }
 
         Ok(uuid::Uuid::new_v4().to_string())
@@ -98,9 +90,7 @@ impl NotificationService for FirebaseNotificationService {
         self.validate_token(device_token)?;
 
         if notification.title.is_empty() {
-            return Err(NotificationError::ServiceError(
-                "Empty title".to_string(),
-            ));
+            return Err(NotificationError::ServiceError("Empty title".to_string()));
         }
 
         let client = reqwest::Client::new();
@@ -134,14 +124,9 @@ impl NotificationService for FirebaseNotificationService {
         }
     }
 
-    async fn set_preferences(
-        &self,
-        preference: NotificationPreference,
-    ) -> Result<(), NotificationError> {
+    async fn set_preferences(&self, preference: NotificationPreference) -> Result<(), NotificationError> {
         if preference.user_id.is_empty() {
-            return Err(NotificationError::InvalidToken(
-                "Empty user_id".to_string(),
-            ));
+            return Err(NotificationError::InvalidToken("Empty user_id".to_string()));
         }
         Ok(())
     }
@@ -158,16 +143,11 @@ impl NotificationService for FirebaseNotificationService {
         })
     }
 
-    async fn schedule_notification(
-        &self,
-        scheduled: ScheduledNotification,
-    ) -> Result<String, NotificationError> {
+    async fn schedule_notification(&self, scheduled: ScheduledNotification) -> Result<String, NotificationError> {
         self.validate_token(&scheduled.device_token)?;
 
         if scheduled.notification.title.is_empty() {
-            return Err(NotificationError::ServiceError(
-                "Empty title".to_string(),
-            ));
+            return Err(NotificationError::ServiceError("Empty title".to_string()));
         }
 
         Ok(uuid::Uuid::new_v4().to_string())

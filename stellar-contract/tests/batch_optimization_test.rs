@@ -5,11 +5,10 @@
 /// - Performance benchmarking
 /// - Batch validation
 /// - Consolidation effectiveness
-
 use soroban_sdk::{testutils::Address as _, vec, Address, Env};
 use stellar_scavngr_contract::batch_optimizer::{
-    BatchConfig, BatchAnalyzer, BatchValidator, PerformanceMetrics,
-    BatchParticipantUpdate, BatchWasteTransfer, batch_update_participants, batch_transfer_waste,
+    batch_transfer_waste, batch_update_participants, BatchAnalyzer, BatchConfig, BatchParticipantUpdate,
+    BatchValidator, BatchWasteTransfer, PerformanceMetrics,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

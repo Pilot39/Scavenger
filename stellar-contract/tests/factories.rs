@@ -28,9 +28,7 @@
 #![allow(dead_code)]
 
 use soroban_sdk::{testutils::Address as _, Address, Env};
-use stellar_scavngr_contract::{
-    ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType};
 
 // ── Environment / client helpers ─────────────────────────────────────────────
 
@@ -49,15 +47,7 @@ pub fn make_client(env: &Env) -> ScavengerContractClient<'_> {
 /// Full environment setup: client + admin + one participant of each role.
 ///
 /// Returns `(client, admin, recycler, collector, manufacturer)`.
-pub fn setup_full_env(
-    env: &Env,
-) -> (
-    ScavengerContractClient<'_>,
-    Address,
-    Address,
-    Address,
-    Address,
-) {
+pub fn setup_full_env(env: &Env) -> (ScavengerContractClient<'_>, Address, Address, Address, Address) {
     env.mock_all_auths();
     let client = make_client_no_auth(env);
     let admin = Address::generate(env);
@@ -90,11 +80,7 @@ impl ParticipantFactory {
     }
 
     /// Register a participant with the given role at (0, 0).
-    pub fn with_role(
-        env: &Env,
-        client: &ScavengerContractClient<'_>,
-        role: ParticipantRole,
-    ) -> Address {
+    pub fn with_role(env: &Env, client: &ScavengerContractClient<'_>, role: ParticipantRole) -> Address {
         let addr = Address::generate(env);
         let name = soroban_sdk::symbol_short!("test");
         client.register_participant(&addr, &role, &name, &0, &0);
@@ -123,47 +109,27 @@ pub struct WasteFactory;
 
 impl WasteFactory {
     /// Submit 1 000 g of Plastic waste and return the waste ID.
-    pub fn plastic(
-        _env: &Env,
-        client: &ScavengerContractClient<'_>,
-        owner: &Address,
-    ) -> u128 {
+    pub fn plastic(_env: &Env, client: &ScavengerContractClient<'_>, owner: &Address) -> u128 {
         Self::with_type(_env, client, owner, WasteType::Plastic, 1_000)
     }
 
     /// Submit 1 000 g of Metal waste and return the waste ID.
-    pub fn metal(
-        _env: &Env,
-        client: &ScavengerContractClient<'_>,
-        owner: &Address,
-    ) -> u128 {
+    pub fn metal(_env: &Env, client: &ScavengerContractClient<'_>, owner: &Address) -> u128 {
         Self::with_type(_env, client, owner, WasteType::Metal, 1_000)
     }
 
     /// Submit 1 000 g of Glass waste and return the waste ID.
-    pub fn glass(
-        _env: &Env,
-        client: &ScavengerContractClient<'_>,
-        owner: &Address,
-    ) -> u128 {
+    pub fn glass(_env: &Env, client: &ScavengerContractClient<'_>, owner: &Address) -> u128 {
         Self::with_type(_env, client, owner, WasteType::Glass, 1_000)
     }
 
     /// Submit 1 000 g of Paper waste and return the waste ID.
-    pub fn paper(
-        _env: &Env,
-        client: &ScavengerContractClient<'_>,
-        owner: &Address,
-    ) -> u128 {
+    pub fn paper(_env: &Env, client: &ScavengerContractClient<'_>, owner: &Address) -> u128 {
         Self::with_type(_env, client, owner, WasteType::Paper, 1_000)
     }
 
     /// Submit 1 000 g of Electronics waste and return the waste ID.
-    pub fn electronics(
-        _env: &Env,
-        client: &ScavengerContractClient<'_>,
-        owner: &Address,
-    ) -> u128 {
+    pub fn electronics(_env: &Env, client: &ScavengerContractClient<'_>, owner: &Address) -> u128 {
         Self::with_type(_env, client, owner, WasteType::Electronics, 1_000)
     }
 
@@ -199,20 +165,12 @@ pub struct IncentiveFactory;
 
 impl IncentiveFactory {
     /// Create a Plastic incentive (100 reward, 1 000 budget) and return the incentive ID.
-    pub fn plastic(
-        _env: &Env,
-        client: &ScavengerContractClient<'_>,
-        manufacturer: &Address,
-    ) -> u64 {
+    pub fn plastic(_env: &Env, client: &ScavengerContractClient<'_>, manufacturer: &Address) -> u64 {
         Self::with_params(_env, client, manufacturer, WasteType::Plastic, 100, 1_000)
     }
 
     /// Create a Metal incentive (200 reward, 2 000 budget) and return the incentive ID.
-    pub fn metal(
-        _env: &Env,
-        client: &ScavengerContractClient<'_>,
-        manufacturer: &Address,
-    ) -> u64 {
+    pub fn metal(_env: &Env, client: &ScavengerContractClient<'_>, manufacturer: &Address) -> u64 {
         Self::with_params(_env, client, manufacturer, WasteType::Metal, 200, 2_000)
     }
 
@@ -225,9 +183,7 @@ impl IncentiveFactory {
         reward: u64,
         budget: u64,
     ) -> u64 {
-        client
-            .create_incentive(manufacturer, &waste_type, &reward, &budget)
-            .id
+        client.create_incentive(manufacturer, &waste_type, &reward, &budget).id
     }
 }
 
@@ -239,12 +195,7 @@ pub struct TransferFactory;
 impl TransferFactory {
     /// Transfer `waste_id` from `from` → `to` at (0, 0).
     /// The soroban test client panics on contract errors automatically.
-    pub fn transfer(
-        client: &ScavengerContractClient<'_>,
-        waste_id: u128,
-        from: &Address,
-        to: &Address,
-    ) {
+    pub fn transfer(client: &ScavengerContractClient<'_>, waste_id: u128, from: &Address, to: &Address) {
         client.transfer_waste_v2(&waste_id, from, to, &0i128, &0i128);
     }
 

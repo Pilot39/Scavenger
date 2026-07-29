@@ -169,9 +169,7 @@ impl ApiBuilder {
     }
 
     /// Build a validation error envelope with per-field detail.
-    pub fn validation_error_response<T: Serialize>(
-        fields: Vec<FieldDetail>,
-    ) -> ApiResponse<T> {
+    pub fn validation_error_response<T: Serialize>(fields: Vec<FieldDetail>) -> ApiResponse<T> {
         ApiResponse {
             data: None,
             error: Some(ApiErrorPayload {
@@ -185,17 +183,8 @@ impl ApiBuilder {
     }
 
     /// Build a paginated success envelope.
-    pub fn paginated_response<T>(
-        items: Vec<T>,
-        total: u32,
-        page: u32,
-        limit: u32,
-    ) -> PaginatedResponse<T> {
-        let total_pages = if limit == 0 {
-            0
-        } else {
-            (total + limit - 1) / limit
-        };
+    pub fn paginated_response<T>(items: Vec<T>, total: u32, page: u32, limit: u32) -> PaginatedResponse<T> {
+        let total_pages = if limit == 0 { 0 } else { (total + limit - 1) / limit };
         PaginatedResponse {
             items,
             total,
@@ -234,8 +223,7 @@ mod tests {
 
     #[test]
     fn error_response_has_error_and_no_data() {
-        let r: ApiResponse<String> =
-            ApiBuilder::error_response("bad_request", "Missing field", 400);
+        let r: ApiResponse<String> = ApiBuilder::error_response("bad_request", "Missing field", 400);
         assert!(r.data.is_none());
         let err = r.error.unwrap();
         assert_eq!(err.code, "bad_request");

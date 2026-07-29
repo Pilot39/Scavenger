@@ -83,8 +83,7 @@ fn test_factory_with_location() {
     let admin = Address::generate(&env);
     client.initialize_admin(&admin);
 
-    let addr =
-        ParticipantFactory::with_location(&env, &client, ParticipantRole::Recycler, 40, 74);
+    let addr = ParticipantFactory::with_location(&env, &client, ParticipantRole::Recycler, 40, 74);
 
     assert!(
         client.is_participant_registered(&addr),
@@ -162,8 +161,7 @@ fn test_factory_waste_with_custom_weight() {
     let env = Env::default();
     let (client, _, recycler, _, _) = setup_full_env(&env);
 
-    let waste_id =
-        WasteFactory::with_type(&env, &client, &recycler, WasteType::Metal, 5_000);
+    let waste_id = WasteFactory::with_type(&env, &client, &recycler, WasteType::Metal, 5_000);
 
     assert!(waste_id > 0);
 }
@@ -173,15 +171,8 @@ fn test_factory_waste_with_location() {
     let env = Env::default();
     let (client, _, recycler, _, _) = setup_full_env(&env);
 
-    let waste_id = WasteFactory::with_location(
-        &env,
-        &client,
-        &recycler,
-        WasteType::Glass,
-        500,
-        40_000_000,
-        -74_000_000,
-    );
+    let waste_id =
+        WasteFactory::with_location(&env, &client, &recycler, WasteType::Glass, 500, 40_000_000, -74_000_000);
 
     assert!(waste_id > 0);
 }
@@ -216,8 +207,7 @@ fn test_factory_creates_incentive_with_custom_params() {
     let env = Env::default();
     let (client, _, _, _, manufacturer) = setup_full_env(&env);
 
-    let incentive_id =
-        IncentiveFactory::with_params(&env, &client, &manufacturer, WasteType::Glass, 500, 10_000);
+    let incentive_id = IncentiveFactory::with_params(&env, &client, &manufacturer, WasteType::Glass, 500, 10_000);
 
     let incentive = client.get_incentive_by_id(&incentive_id).expect("Incentive must exist");
     assert_eq!(incentive.reward_points, 500);

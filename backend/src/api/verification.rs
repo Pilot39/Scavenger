@@ -1,9 +1,9 @@
+use crate::services::VerificationService;
+use crate::validation::{error_response, sanitize_string, validate_required, ValidationError};
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::collections::HashMap;
-use crate::services::VerificationService;
-use crate::validation::{error_response, validate_required, sanitize_string, ValidationError};
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct StartVerificationRequest {
@@ -141,10 +141,7 @@ pub async fn submit_document(
         return error_response(&errors);
     }
 
-    match service
-        .submit_document(participant_id, doc_type, url)
-        .await
-    {
+    match service.submit_document(participant_id, doc_type, url).await {
         Ok(document) => HttpResponse::Ok().json(ApiResponse::success(document)),
         Err(e) => HttpResponse::BadRequest().json(ApiResponse::<String>::error(e)),
     }
@@ -205,18 +202,13 @@ pub async fn submit_checklist(
         return error_response(&errors);
     }
 
-    match service
-        .submit_checklist(participant_id, req.checks.clone())
-        .await
-    {
+    match service.submit_checklist(participant_id, req.checks.clone()).await {
         Ok(checklist) => HttpResponse::Ok().json(ApiResponse::success(checklist)),
         Err(e) => HttpResponse::BadRequest().json(ApiResponse::<String>::error(e)),
     }
 }
 
-pub async fn get_pending_reviews(
-    service: web::Data<Arc<dyn VerificationService>>,
-) -> HttpResponse {
+pub async fn get_pending_reviews(service: web::Data<Arc<dyn VerificationService>>) -> HttpResponse {
     match service.get_pending_reviews().await {
         Ok(reviews) => HttpResponse::Ok().json(ApiResponse::success(reviews)),
         Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String>::error(e)),
@@ -242,10 +234,7 @@ pub async fn approve_participant(
         return error_response(&errors);
     }
 
-    match service
-        .approve_participant(participant_id.clone(), reviewer_id)
-        .await
-    {
+    match service.approve_participant(participant_id.clone(), reviewer_id).await {
         Ok(_) => {
             let _ = service.send_approval_notification(participant_id).await;
             HttpResponse::Ok().json(ApiResponse::success(serde_json::json!({"status": "approved"})))
@@ -282,9 +271,7 @@ pub async fn reject_participant(
         .await
     {
         Ok(_) => {
-            let _ = service
-                .send_rejection_notification(participant_id, reason)
-                .await;
+            let _ = service.send_rejection_notification(participant_id, reason).await;
             HttpResponse::Ok().json(ApiResponse::success(serde_json::json!({"status": "rejected"})))
         }
         Err(e) => HttpResponse::BadRequest().json(ApiResponse::<String>::error(e)),
@@ -311,19 +298,14 @@ pub async fn retry_verification(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::verification::{Document, ParticipantVerification, VerificationChecklist, VerificationStatus};
     use async_trait::async_trait;
-    use crate::services::verification::{
-        Document, ParticipantVerification, VerificationChecklist, VerificationStatus,
-    };
 
     struct MockVerificationService;
 
     #[async_trait]
     impl VerificationService for MockVerificationService {
-        async fn start_verification(
-            &self,
-            participant_id: String,
-        ) -> Result<ParticipantVerification, String> {
+        async fn start_verification(&self, participant_id: String) -> Result<ParticipantVerification, String> {
             Ok(ParticipantVerification {
                 participant_id: participant_id.clone(),
                 status: VerificationStatus::Pending,
@@ -343,10 +325,7 @@ mod tests {
             })
         }
 
-        async fn get_verification_status(
-            &self,
-            participant_id: String,
-        ) -> Result<ParticipantVerification, String> {
+        async fn get_verification_status(&self, participant_id: String) -> Result<ParticipantVerification, String> {
             Ok(ParticipantVerification {
                 participant_id: participant_id.clone(),
                 status: VerificationStatus::Pending,
@@ -400,10 +379,7 @@ mod tests {
             })
         }
 
-        async fn create_review_queue_item(
-            &self,
-            _participant_id: String,
-        ) -> Result<String, String> {
+        async fn create_review_queue_item(&self, _participant_id: String) -> Result<String, String> {
             Ok("queue-item-001".to_string())
         }
 
@@ -411,11 +387,7 @@ mod tests {
             Ok(vec![])
         }
 
-        async fn approve_participant(
-            &self,
-            _participant_id: String,
-            _reviewer_id: String,
-        ) -> Result<(), String> {
+        async fn approve_participant(&self, _participant_id: String, _reviewer_id: String) -> Result<(), String> {
             Ok(())
         }
 
@@ -428,10 +400,7 @@ mod tests {
             Ok(())
         }
 
-        async fn retry_verification(
-            &self,
-            participant_id: String,
-        ) -> Result<ParticipantVerification, String> {
+        async fn retry_verification(&self, participant_id: String) -> Result<ParticipantVerification, String> {
             Ok(ParticipantVerification {
                 participant_id: participant_id.clone(),
                 status: VerificationStatus::Pending,
@@ -455,11 +424,7 @@ mod tests {
             Ok(())
         }
 
-        async fn send_rejection_notification(
-            &self,
-            _participant_id: String,
-            _reason: String,
-        ) -> Result<(), String> {
+        async fn send_rejection_notification(&self, _participant_id: String, _reason: String) -> Result<(), String> {
             Ok(())
         }
     }

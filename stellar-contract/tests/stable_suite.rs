@@ -48,15 +48,15 @@ fn setup(env: &Env) -> (ScavengerContractClient<'_>, Address, Address, Address, 
     let contract_id = env.register_contract(None, ScavengerContract);
     let client = ScavengerContractClient::new(env, &contract_id);
 
-    let admin        = Address::generate(env);
-    let recycler     = Address::generate(env);
-    let collector    = Address::generate(env);
+    let admin = Address::generate(env);
+    let recycler = Address::generate(env);
+    let collector = Address::generate(env);
     let manufacturer = Address::generate(env);
-    let name         = soroban_sdk::symbol_short!("test");
+    let name = soroban_sdk::symbol_short!("test");
 
     client.initialize_admin(&admin);
-    client.register_participant(&recycler,     &ParticipantRole::Recycler,     &name, &0i128, &0i128);
-    client.register_participant(&collector,    &ParticipantRole::Collector,    &name, &0i128, &0i128);
+    client.register_participant(&recycler, &ParticipantRole::Recycler, &name, &0i128, &0i128);
+    client.register_participant(&collector, &ParticipantRole::Collector, &name, &0i128, &0i128);
     client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &name, &0i128, &0i128);
 
     (client, admin, recycler, collector, manufacturer)
@@ -122,8 +122,8 @@ fn stable_waste_id_increases_monotonically() {
     let (client, _, recycler, _, _) = setup(&env);
 
     let id1 = client.recycle_waste(&WasteType::Plastic, &1000u128, &recycler, &0i128, &0i128);
-    let id2 = client.recycle_waste(&WasteType::Metal,   &1000u128, &recycler, &0i128, &0i128);
-    let id3 = client.recycle_waste(&WasteType::Glass,   &1000u128, &recycler, &0i128, &0i128);
+    let id2 = client.recycle_waste(&WasteType::Metal, &1000u128, &recycler, &0i128, &0i128);
+    let id3 = client.recycle_waste(&WasteType::Glass, &1000u128, &recycler, &0i128, &0i128);
 
     // IDs are assigned sequentially — always strictly increasing.
     assert!(id2 > id1, "ID must increase: {} > {}", id2, id1);
@@ -177,7 +177,8 @@ fn stable_incentive_id_is_deterministic() {
     let inc = client.create_incentive(&manufacturer, &WasteType::Plastic, &100u64, &1_000u64);
 
     // Whatever the first ID is, it must be consistent across runs.
-    let inc2 = client.get_incentive_by_id(&inc.id)
+    let inc2 = client
+        .get_incentive_by_id(&inc.id)
         .expect("Incentive must be retrievable by the ID returned at creation");
 
     assert_eq!(inc.id, inc2.id);
@@ -190,7 +191,7 @@ fn stable_two_incentives_have_distinct_ids() {
     let (client, _, _, _, manufacturer) = setup(&env);
 
     let inc1 = client.create_incentive(&manufacturer, &WasteType::Plastic, &100u64, &1_000u64);
-    let inc2 = client.create_incentive(&manufacturer, &WasteType::Metal,   &200u64, &2_000u64);
+    let inc2 = client.create_incentive(&manufacturer, &WasteType::Metal, &200u64, &2_000u64);
 
     assert_ne!(inc1.id, inc2.id);
 }
@@ -209,7 +210,7 @@ fn stable_transfer_recorded_in_history() {
     // History always has exactly one record after one transfer.
     assert_eq!(history.len(), 1, "Expected exactly 1 transfer record");
     assert_eq!(history.get(0).unwrap().from, recycler);
-    assert_eq!(history.get(0).unwrap().to,   collector);
+    assert_eq!(history.get(0).unwrap().to, collector);
 }
 
 #[test]
@@ -218,7 +219,7 @@ fn stable_multi_hop_transfer_history_length() {
     let (client, _, recycler, collector, manufacturer) = setup(&env);
 
     let id = client.recycle_waste(&WasteType::Metal, &1_000u128, &recycler, &0i128, &0i128);
-    client.transfer_waste_v2(&id, &recycler, &collector,    &0i128, &0i128);
+    client.transfer_waste_v2(&id, &recycler, &collector, &0i128, &0i128);
     client.transfer_waste_v2(&id, &collector, &manufacturer, &0i128, &0i128);
 
     let history = client.get_waste_transfer_history_v2(&id);
@@ -231,7 +232,7 @@ fn stable_independent_wastes_have_independent_histories() {
     let (client, _, recycler, collector, _) = setup(&env);
 
     let id1 = client.recycle_waste(&WasteType::Plastic, &1_000u128, &recycler, &0i128, &0i128);
-    let id2 = client.recycle_waste(&WasteType::Glass,   &1_000u128, &recycler, &0i128, &0i128);
+    let id2 = client.recycle_waste(&WasteType::Glass, &1_000u128, &recycler, &0i128, &0i128);
 
     // Only transfer id1
     client.transfer_waste_v2(&id1, &recycler, &collector, &0i128, &0i128);
@@ -252,7 +253,7 @@ fn stable_metrics_reflect_waste_count() {
 
     let before = client.get_metrics().total_wastes_count;
     client.recycle_waste(&WasteType::Plastic, &1_000u128, &recycler, &0i128, &0i128);
-    client.recycle_waste(&WasteType::Metal,   &1_000u128, &recycler, &0i128, &0i128);
+    client.recycle_waste(&WasteType::Metal, &1_000u128, &recycler, &0i128, &0i128);
     let after = client.get_metrics().total_wastes_count;
 
     assert_eq!(after, before + 2, "Metrics must reflect exactly the wastes added");
