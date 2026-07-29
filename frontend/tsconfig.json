@@ -3,6 +3,23 @@
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "jsx": "react-jsx",
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/components/*": ["src/components/*"],
+      "@/pages/*": ["src/pages/*"],
+      "@/hooks/*": ["src/hooks/*"],
+      "@/lib/*": ["src/lib/*"],
+      "@/context/*": ["src/context/*"],
+      "@/types/*": ["src/types/*"],
+      "@/config/*": ["src/config/*"],
+      "@/stories/*": ["src/stories/*"],
+      "@/api/*": ["src/api/*"],
+      "@/assets/*": ["src/assets/*"],
+      "@/i18n/*": ["src/i18n/*"],
+      "@/test/*": ["src/test/*"]
+    }
     "outDir": "./dist",
     "rootDir": "./src",
     "types": ["node", "@testing-library/jest-dom", "vitest/globals"],

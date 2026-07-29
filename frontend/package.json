@@ -39,6 +39,7 @@
     "mutation:score": "node scripts/record-mutation-score.mjs"
   },
   "dependencies": {
+    "@scavngr/types": "workspace:*",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-dialog": "^1.1.15",
