@@ -1,31 +1,35 @@
-mod services;
-mod middleware;
 mod api;
 mod cache;
 mod compliance;
 mod container;
-mod security;
-mod validation;
-mod search;
 mod errors;
+mod middleware;
 mod rpc;
+mod search;
+mod security;
+mod services;
+mod validation;
 
-use actix_web::{web, App, HttpServer, HttpResponse, HttpRequest, ResponseError};
 use actix_cors::Cors;
-use services::{
-    WebhookManager,
-};
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, ResponseError};
+use services::WebhookManager;
 // Removed unused imports: RecommendationEngine, NFTManager, ChainAbstraction (#906)
-use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware, RequestIdMiddleware, IdempotencyMiddleware};
+use api::{
+    archival as archival_api, audit, compliance_api, contracts, export, search as search_api, signing_api,
+    verification, ws,
+};
 use cache::{Cache, CacheInvalidationManager};
+use middleware::{
+    CsrfMiddleware, IdempotencyMiddleware, RateLimitConfig, RateLimitMiddleware, RequestIdMiddleware,
+    ValidationMiddleware,
+};
 use rpc::{StellarRpcClient, StellarRpcConfig};
-use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api, archival as archival_api};
 // analytics API removed — legacy unregistered routes cleaned up (#906)
-use errors::AppError;
 use container::AppContainer;
+use errors::AppError;
 use std::sync::Arc;
 use tracing::info;
-use tracing_subscriber::{fmt, EnvFilter, prelude::*};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -33,8 +37,7 @@ async fn main() -> std::io::Result<()> {
         .map(|v| v.to_lowercase() == "json")
         .unwrap_or(false);
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     if use_json {
         tracing_subscriber::registry()
@@ -51,23 +54,22 @@ async fn main() -> std::io::Result<()> {
     info!(service = "backend", "Starting Scavenger Backend Server on 0.0.0.0:8080");
 
     // Build the DI container (#914) — all services are constructed here.
-    let container = AppContainer::from_env()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let container = AppContainer::from_env().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     // Destructure what the closures below need so we can `.clone()` into each
     // worker thread without keeping the whole container alive.
-    let email_service      = container.email.clone();
+    let email_service = container.email.clone();
     let notification_service = container.notification.clone();
-    let reporting_service  = container.reporting.clone();
-    let storage_service    = container.storage.clone();
-    let webhook_manager    = container.webhook.clone();
-    let cache              = container.cache.clone();
+    let reporting_service = container.reporting.clone();
+    let storage_service = container.storage.clone();
+    let webhook_manager = container.webhook.clone();
+    let cache = container.cache.clone();
     let cache_invalidation = container.cache_invalidation.clone();
-    let audit_service      = container.audit.clone();
+    let audit_service = container.audit.clone();
     let verification_service = container.verification.clone();
-    let search_client      = container.search.clone();
-    let archival_service   = container.archival.clone();
-    let stellar_client     = container.stellar.clone();
+    let search_client = container.search.clone();
+    let archival_service = container.archival.clone();
+    let stellar_client = container.stellar.clone();
 
     info!(
         horizon = %stellar_client.horizon_url(),
@@ -79,8 +81,7 @@ async fn main() -> std::io::Result<()> {
     let rate_limit_config = RateLimitConfig::default();
     let ws_manager = ws::WsConnectionManager::new();
     let csrf_secret = std::env::var("CSRF_SECRET").unwrap_or_else(|_| "change-me-in-production".to_string());
-    let allowed_origins = std::env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let allowed_origins = std::env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
     HttpServer::new(move || {
         let cors = {
@@ -128,12 +129,24 @@ async fn main() -> std::io::Result<()> {
             // Contract Queries (Task 1)
             .route("/api/v1/contracts/wastes", web::get().to(contracts::list_wastes))
             .route("/api/v1/contracts/wastes/{id}", web::get().to(contracts::get_waste))
-            .route("/api/v1/contracts/participants", web::get().to(contracts::list_participants))
-            .route("/api/v1/contracts/participants/{id}", web::get().to(contracts::get_participant))
+            .route(
+                "/api/v1/contracts/participants",
+                web::get().to(contracts::list_participants),
+            )
+            .route(
+                "/api/v1/contracts/participants/{id}",
+                web::get().to(contracts::get_participant),
+            )
             .route("/api/v1/contracts/stats", web::get().to(contracts::get_contract_stats))
             .route("/api/v1/contracts/info", web::get().to(contracts::get_contract_info))
-            .route("/api/v1/cache/invalidate/waste/{id}", web::post().to(contracts::invalidate_waste_cache))
-            .route("/api/v1/cache/invalidate/all", web::post().to(contracts::invalidate_all_cache))
+            .route(
+                "/api/v1/cache/invalidate/waste/{id}",
+                web::post().to(contracts::invalidate_waste_cache),
+            )
+            .route(
+                "/api/v1/cache/invalidate/all",
+                web::post().to(contracts::invalidate_all_cache),
+            )
             .route("/api/v1/cache/metrics", web::get().to(contracts::cache_metrics))
             // WebSocket (Task 2)
             .route("/ws", web::get().to(ws::ws_handler))
@@ -143,9 +156,18 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/exports", web::get().to(export::list_exports))
             .route("/api/v1/exports/{id}/download", web::get().to(export::download_export))
             .route("/api/v1/exports/{id}/email", web::post().to(export::send_export_email))
-            .route("/api/v1/exports/scheduled", web::post().to(export::create_scheduled_export))
-            .route("/api/v1/exports/scheduled", web::get().to(export::list_scheduled_exports))
-            .route("/api/v1/exports/scheduled/{id}", web::delete().to(export::delete_scheduled_export))
+            .route(
+                "/api/v1/exports/scheduled",
+                web::post().to(export::create_scheduled_export),
+            )
+            .route(
+                "/api/v1/exports/scheduled",
+                web::get().to(export::list_scheduled_exports),
+            )
+            .route(
+                "/api/v1/exports/scheduled/{id}",
+                web::delete().to(export::delete_scheduled_export),
+            )
             // Audit (Task 4)
             .route("/api/v1/audit/logs", web::get().to(audit::list_audit_logs))
             .route("/api/v1/audit/logs/{id}", web::get().to(audit::get_audit_entry))
@@ -158,33 +180,93 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/audit/retention", web::put().to(audit::update_retention_policy))
             .route("/api/v1/audit/purge", web::post().to(audit::purge_old_logs))
             // Verification (Task 5)
-            .route("/api/v1/verification/start", web::post().to(verification::start_verification))
-            .route("/api/v1/verification/{participant_id}/status", web::get().to(verification::get_verification_status))
-            .route("/api/v1/verification/document", web::post().to(verification::submit_document))
-            .route("/api/v1/verification/document/{doc_id}/verify", web::post().to(verification::verify_document))
-            .route("/api/v1/verification/checklist", web::post().to(verification::submit_checklist))
-            .route("/api/v1/verification/pending-reviews", web::get().to(verification::get_pending_reviews))
-            .route("/api/v1/verification/approve", web::post().to(verification::approve_participant))
-            .route("/api/v1/verification/reject", web::post().to(verification::reject_participant))
-            .route("/api/v1/verification/{participant_id}/retry", web::post().to(verification::retry_verification))
+            .route(
+                "/api/v1/verification/start",
+                web::post().to(verification::start_verification),
+            )
+            .route(
+                "/api/v1/verification/{participant_id}/status",
+                web::get().to(verification::get_verification_status),
+            )
+            .route(
+                "/api/v1/verification/document",
+                web::post().to(verification::submit_document),
+            )
+            .route(
+                "/api/v1/verification/document/{doc_id}/verify",
+                web::post().to(verification::verify_document),
+            )
+            .route(
+                "/api/v1/verification/checklist",
+                web::post().to(verification::submit_checklist),
+            )
+            .route(
+                "/api/v1/verification/pending-reviews",
+                web::get().to(verification::get_pending_reviews),
+            )
+            .route(
+                "/api/v1/verification/approve",
+                web::post().to(verification::approve_participant),
+            )
+            .route(
+                "/api/v1/verification/reject",
+                web::post().to(verification::reject_participant),
+            )
+            .route(
+                "/api/v1/verification/{participant_id}/retry",
+                web::post().to(verification::retry_verification),
+            )
             // Compliance Monitoring (Task 6)
-            .route("/api/v1/compliance/checklists", web::get().to(compliance_api::list_checklists))
-            .route("/api/v1/compliance/checklists", web::post().to(compliance_api::create_checklist))
-            .route("/api/v1/compliance/check", web::post().to(compliance_api::run_compliance_check))
-            .route("/api/v1/compliance/alerts", web::get().to(compliance_api::list_compliance_alerts))
-            .route("/api/v1/compliance/alert-rules", web::post().to(compliance_api::create_alert_rule))
-            .route("/api/v1/compliance/alert-rules", web::get().to(compliance_api::list_alert_rules))
-            .route("/api/v1/compliance/audit-trail", web::get().to(compliance_api::get_audit_trail))
-            .route("/api/v1/compliance/report", web::post().to(compliance_api::generate_compliance_report))
+            .route(
+                "/api/v1/compliance/checklists",
+                web::get().to(compliance_api::list_checklists),
+            )
+            .route(
+                "/api/v1/compliance/checklists",
+                web::post().to(compliance_api::create_checklist),
+            )
+            .route(
+                "/api/v1/compliance/check",
+                web::post().to(compliance_api::run_compliance_check),
+            )
+            .route(
+                "/api/v1/compliance/alerts",
+                web::get().to(compliance_api::list_compliance_alerts),
+            )
+            .route(
+                "/api/v1/compliance/alert-rules",
+                web::post().to(compliance_api::create_alert_rule),
+            )
+            .route(
+                "/api/v1/compliance/alert-rules",
+                web::get().to(compliance_api::list_alert_rules),
+            )
+            .route(
+                "/api/v1/compliance/audit-trail",
+                web::get().to(compliance_api::get_audit_trail),
+            )
+            .route(
+                "/api/v1/compliance/report",
+                web::post().to(compliance_api::generate_compliance_report),
+            )
             // Transaction Signing (Task 7)
             .route("/api/v1/signing/sign", web::post().to(signing_api::sign_transaction))
             .route("/api/v1/signing/verify", web::post().to(signing_api::verify_signature))
             .route("/api/v1/signing/multisig", web::post().to(signing_api::create_multisig))
-            .route("/api/v1/signing/multisig/sign", web::post().to(signing_api::multisig_sign))
+            .route(
+                "/api/v1/signing/multisig/sign",
+                web::post().to(signing_api::multisig_sign),
+            )
             .route("/api/v1/signing/revoke", web::post().to(signing_api::revoke_signature))
             .route("/api/v1/signing/events", web::get().to(signing_api::list_events))
-            .route("/api/v1/signing/revocations", web::get().to(signing_api::list_revocations))
-            .route("/api/v1/signing/documentation", web::get().to(signing_api::get_documentation))
+            .route(
+                "/api/v1/signing/revocations",
+                web::get().to(signing_api::list_revocations),
+            )
+            .route(
+                "/api/v1/signing/documentation",
+                web::get().to(signing_api::get_documentation),
+            )
             // Search (Task 8)
             .route("/api/v1/search", web::get().to(search_api::search))
             .route("/api/v1/search/suggest", web::get().to(search_api::suggest))
@@ -192,13 +274,28 @@ async fn main() -> std::io::Result<()> {
             // Archival (Task 9)
             .route("/api/v1/archival/policies", web::post().to(archival_api::create_policy))
             .route("/api/v1/archival/policies", web::get().to(archival_api::list_policies))
-            .route("/api/v1/archival/policies/{id}", web::get().to(archival_api::get_policy))
-            .route("/api/v1/archival/policies/{id}", web::put().to(archival_api::update_policy))
-            .route("/api/v1/archival/policies/{id}", web::delete().to(archival_api::delete_policy))
+            .route(
+                "/api/v1/archival/policies/{id}",
+                web::get().to(archival_api::get_policy),
+            )
+            .route(
+                "/api/v1/archival/policies/{id}",
+                web::put().to(archival_api::update_policy),
+            )
+            .route(
+                "/api/v1/archival/policies/{id}",
+                web::delete().to(archival_api::delete_policy),
+            )
             .route("/api/v1/archival/archives", web::get().to(archival_api::query_archives))
             .route("/api/v1/archival/archives", web::post().to(archival_api::archive_data))
-            .route("/api/v1/archival/archives/{id}", web::delete().to(archival_api::delete_archive))
-            .route("/api/v1/archival/archives/{id}/restore", web::post().to(archival_api::restore_data))
+            .route(
+                "/api/v1/archival/archives/{id}",
+                web::delete().to(archival_api::delete_archive),
+            )
+            .route(
+                "/api/v1/archival/archives/{id}/restore",
+                web::post().to(archival_api::restore_data),
+            )
             .route("/api/v1/archival/stats", web::get().to(archival_api::get_statistics))
             .route("/api/v1/archival/jobs", web::get().to(archival_api::list_jobs))
             .route("/api/v1/archival/jobs/{id}", web::get().to(archival_api::get_job))

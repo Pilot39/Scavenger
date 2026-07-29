@@ -115,21 +115,27 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefix ${{ matrix.workspace }}
 
-      - name: npm audit
+      - name: npm audit (fail on moderate+)
         run: |
           npm audit --prefix ${{ matrix.workspace }} \
-            --audit-level=high \
+            --audit-level=moderate \
             --json > npm-audit-${{ matrix.workspace }}.json || true
 
-      - name: Check for critical vulnerabilities
+      - name: Check for high/critical vulnerabilities
         run: |
           CRITICAL=$(jq '.metadata.vulnerabilities.critical // 0' \
             npm-audit-${{ matrix.workspace }}.json)
           HIGH=$(jq '.metadata.vulnerabilities.high // 0' \
             npm-audit-${{ matrix.workspace }}.json)
-          echo "Critical: $CRITICAL, High: $HIGH"
+          MODERATE=$(jq '.metadata.vulnerabilities.moderate // 0' \
+            npm-audit-${{ matrix.workspace }}.json)
+          echo "Critical: $CRITICAL, High: $HIGH, Moderate: $MODERATE"
           if [ "$CRITICAL" -gt "0" ]; then
             echo "::error::Critical npm vulnerabilities found in ${{ matrix.workspace }}"
+            exit 1
+          fi
+          if [ "$HIGH" -gt "0" ]; then
+            echo "::error::High npm vulnerabilities found in ${{ matrix.workspace }}"
             exit 1
           fi
 

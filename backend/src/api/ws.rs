@@ -73,8 +73,9 @@ pub async fn ws_handler(
     manager: web::Data<WsConnectionManager>,
 ) -> Result<HttpResponse, actix_web::Error> {
     if manager.is_shutting_down() {
-        return Ok(HttpResponse::ServiceUnavailable()
-            .json(ApiBuilder::error_response::<String>("server shutting down")));
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(ApiBuilder::error_response::<String>("server shutting down"))
+        );
     }
 
     let (response, mut session, mut msg_stream) = actix_ws::handle(&req, stream)?;

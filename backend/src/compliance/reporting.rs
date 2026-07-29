@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use chrono::Utc;
-use super::monitor::ComplianceMonitor;
 use super::checklist::ComplianceChecklist;
+use super::monitor::ComplianceMonitor;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReportRequest {
@@ -42,7 +42,10 @@ impl ComplianceReportingService {
         }
     }
 
-    pub fn generate_detailed_report(&self, checklist: &ComplianceChecklist) -> (ReportSummary, Vec<super::monitor::CheckResult>) {
+    pub fn generate_detailed_report(
+        &self,
+        checklist: &ComplianceChecklist,
+    ) -> (ReportSummary, Vec<super::monitor::CheckResult>) {
         let report = self.monitor.evaluate_checklist(checklist);
         (
             ReportSummary {

@@ -1,6 +1,6 @@
+use crate::validation::{error_response, sanitize_string, validate_required, ValidationError};
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
-use crate::validation::{error_response, validate_required, sanitize_string, ValidationError};
 
 #[derive(Debug, Deserialize)]
 pub struct SignRequest {

@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 /// #802 - Notification Delivery Service
 /// Multi-channel (email, SMS, push) with retry logic, delivery tracking, and templates.
 use serde::{Deserialize, Serialize};
@@ -5,7 +6,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 
@@ -113,12 +113,7 @@ pub struct NotificationResult {
 #[async_trait::async_trait]
 pub trait ChannelSender: Send + Sync {
     fn channel(&self) -> Channel;
-    async fn send(
-        &self,
-        recipient: &str,
-        subject: &str,
-        body: &str,
-    ) -> Result<(), DeliveryError>;
+    async fn send(&self, recipient: &str, subject: &str, body: &str) -> Result<(), DeliveryError>;
 }
 
 // ── Concrete senders ──────────────────────────────────────────────────────────
@@ -213,10 +208,7 @@ impl NotificationDeliveryService {
     // ── Template management ────────────────────────────────────────────────
 
     pub fn add_template(&self, template: NotificationTemplate) {
-        self.templates
-            .lock()
-            .unwrap()
-            .insert(template.id.clone(), template);
+        self.templates.lock().unwrap().insert(template.id.clone(), template);
     }
 
     pub fn get_template(&self, id: &str) -> Option<NotificationTemplate> {
@@ -226,12 +218,7 @@ impl NotificationDeliveryService {
     // ── Delivery tracking ──────────────────────────────────────────────────
 
     pub fn get_record(&self, record_id: &str) -> Option<DeliveryRecord> {
-        self.records
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|r| r.id == record_id)
-            .cloned()
+        self.records.lock().unwrap().iter().find(|r| r.id == record_id).cloned()
     }
 
     pub fn get_records_by_notification(&self, notification_id: &str) -> Vec<DeliveryRecord> {
@@ -279,11 +266,7 @@ impl NotificationDeliveryService {
         let mut results = Vec::new();
 
         for channel in &req.channels {
-            let recipient = req
-                .recipients
-                .get(channel)
-                .cloned()
-                .unwrap_or_default();
+            let recipient = req.recipients.get(channel).cloned().unwrap_or_default();
 
             let record_id = Uuid::new_v4().to_string();
             let mut record = DeliveryRecord {
@@ -305,8 +288,7 @@ impl NotificationDeliveryService {
                 Some(s) => s.clone(),
                 None => {
                     record.status = DeliveryStatus::Failed;
-                    record.last_error =
-                        Some(format!("No sender registered for {:?}", channel));
+                    record.last_error = Some(format!("No sender registered for {:?}", channel));
                     record.updated_at = Utc::now();
                     self.upsert_record(record.clone());
                     results.push(record);
@@ -456,10 +438,7 @@ mod tests {
             subject: None,
             body: None,
         };
-        assert!(matches!(
-            svc.send(req).await,
-            Err(DeliveryError::TemplateNotFound(_))
-        ));
+        assert!(matches!(svc.send(req).await, Err(DeliveryError::TemplateNotFound(_))));
     }
 
     #[tokio::test]

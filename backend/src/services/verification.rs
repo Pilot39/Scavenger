@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
-use std::collections::HashMap;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum VerificationStatus {
@@ -64,10 +64,19 @@ pub trait VerificationService: Send + Sync {
     async fn submit_document(&self, participant_id: String, doc_type: String, url: String) -> Result<Document, String>;
     async fn verify_document(&self, doc_id: String) -> Result<Document, String>;
     async fn get_verification_status(&self, participant_id: String) -> Result<ParticipantVerification, String>;
-    async fn submit_checklist(&self, participant_id: String, checks: HashMap<String, bool>) -> Result<VerificationChecklist, String>;
+    async fn submit_checklist(
+        &self,
+        participant_id: String,
+        checks: HashMap<String, bool>,
+    ) -> Result<VerificationChecklist, String>;
     async fn create_review_queue_item(&self, participant_id: String) -> Result<String, String>;
     async fn approve_participant(&self, participant_id: String, reviewer_id: String) -> Result<(), String>;
-    async fn reject_participant(&self, participant_id: String, reason: String, reviewer_id: String) -> Result<(), String>;
+    async fn reject_participant(
+        &self,
+        participant_id: String,
+        reason: String,
+        reviewer_id: String,
+    ) -> Result<(), String>;
     async fn get_pending_reviews(&self) -> Result<Vec<ParticipantVerification>, String>;
     async fn retry_verification(&self, participant_id: String) -> Result<ParticipantVerification, String>;
     async fn send_approval_notification(&self, participant_id: String) -> Result<(), String>;
@@ -181,7 +190,11 @@ impl VerificationService for DefaultVerificationService {
             .ok_or_else(|| "Verification not found".to_string())
     }
 
-    async fn submit_checklist(&self, participant_id: String, checks: HashMap<String, bool>) -> Result<VerificationChecklist, String> {
+    async fn submit_checklist(
+        &self,
+        participant_id: String,
+        checks: HashMap<String, bool>,
+    ) -> Result<VerificationChecklist, String> {
         let mut verifications = self.verifications.lock().await;
         if let Some(verification) = verifications.get_mut(&participant_id) {
             verification.checklist.checks = checks;
@@ -214,7 +227,12 @@ impl VerificationService for DefaultVerificationService {
         }
     }
 
-    async fn reject_participant(&self, participant_id: String, reason: String, reviewer_id: String) -> Result<(), String> {
+    async fn reject_participant(
+        &self,
+        participant_id: String,
+        reason: String,
+        reviewer_id: String,
+    ) -> Result<(), String> {
         let mut verifications = self.verifications.lock().await;
         if let Some(verification) = verifications.get_mut(&participant_id) {
             verification.status = VerificationStatus::Rejected;
@@ -257,7 +275,11 @@ impl VerificationService for DefaultVerificationService {
 
     async fn send_rejection_notification(&self, participant_id: String, reason: String) -> Result<(), String> {
         // Integration point for notification service
-        tracing::info!("Sending rejection notification for participant: {} - reason: {}", participant_id, reason);
+        tracing::info!(
+            "Sending rejection notification for participant: {} - reason: {}",
+            participant_id,
+            reason
+        );
         Ok(())
     }
 }
@@ -271,7 +293,7 @@ mod tests {
         let service = DefaultVerificationService::new();
         let result = service.start_verification("test-participant".to_string()).await;
         assert!(result.is_ok());
-        
+
         let verification = result.unwrap();
         assert!(matches!(verification.status, VerificationStatus::Pending));
         assert_eq!(verification.participant_id, "test-participant");
@@ -280,15 +302,22 @@ mod tests {
     #[tokio::test]
     async fn test_submit_and_verify_document() {
         let service = DefaultVerificationService::new();
-        service.start_verification("test-participant".to_string()).await.unwrap();
-        
-        let doc = service
-            .submit_document("test-participant".to_string(), "passport".to_string(), "http://example.com/doc".to_string())
+        service
+            .start_verification("test-participant".to_string())
             .await
             .unwrap();
-        
+
+        let doc = service
+            .submit_document(
+                "test-participant".to_string(),
+                "passport".to_string(),
+                "http://example.com/doc".to_string(),
+            )
+            .await
+            .unwrap();
+
         assert!(!doc.verified);
-        
+
         let verified_doc = service.verify_document(doc.id.clone()).await.unwrap();
         assert!(verified_doc.verified);
     }

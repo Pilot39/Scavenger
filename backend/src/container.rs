@@ -26,14 +26,9 @@ use crate::{
     rpc::{StellarRpcClient, StellarRpcConfig},
     search::{SearchClient, SearchClientConfig},
     services::{
-        AuditService, ArchivalService,
-        EmailService, SendGridEmailService,
-        FileSystemArchivalStorage,
-        NotificationService, FirebaseNotificationService,
-        ReportService, ReportingService,
-        StorageService, S3StorageService,
-        VerificationService, DefaultVerificationService,
-        WebhookManager,
+        ArchivalService, AuditService, DefaultVerificationService, EmailService, FileSystemArchivalStorage,
+        FirebaseNotificationService, NotificationService, ReportService, ReportingService, S3StorageService,
+        SendGridEmailService, StorageService, VerificationService, WebhookManager,
     },
 };
 
@@ -58,14 +53,12 @@ impl AppContainer {
     pub fn from_env() -> Result<Self, String> {
         let email_service: Arc<dyn EmailService> = Arc::new(SendGridEmailService::new(
             std::env::var("SENDGRID_API_KEY").unwrap_or_default(),
-            std::env::var("FROM_EMAIL")
-                .unwrap_or_else(|_| "noreply@scavenger.io".to_string()),
+            std::env::var("FROM_EMAIL").unwrap_or_else(|_| "noreply@scavenger.io".to_string()),
         ));
 
-        let notification_service: Arc<dyn NotificationService> =
-            Arc::new(FirebaseNotificationService::new(
-                std::env::var("FIREBASE_PROJECT_ID").unwrap_or_default(),
-            ));
+        let notification_service: Arc<dyn NotificationService> = Arc::new(FirebaseNotificationService::new(
+            std::env::var("FIREBASE_PROJECT_ID").unwrap_or_default(),
+        ));
 
         let reporting_service: Arc<dyn ReportService> = Arc::new(ReportingService::new(
             std::env::var("STORAGE_PATH").unwrap_or_else(|_| "/tmp".to_string()),
@@ -80,36 +73,30 @@ impl AppContainer {
         let cache = Cache::new(300);
         let cache_invalidation = Arc::new(CacheInvalidationManager::new());
         let audit_service = Arc::new(AuditService::new());
-        let verification_service: Arc<dyn VerificationService> =
-            Arc::new(DefaultVerificationService::new());
+        let verification_service: Arc<dyn VerificationService> = Arc::new(DefaultVerificationService::new());
 
         // Stellar RPC
         let stellar_rpc_config = StellarRpcConfig::from_env();
-        let stellar_client = Arc::new(
-            StellarRpcClient::new(stellar_rpc_config)
-                .map_err(|e| format!("Stellar RPC init failed: {e}"))?,
-        );
+        let stellar_client =
+            Arc::new(StellarRpcClient::new(stellar_rpc_config).map_err(|e| format!("Stellar RPC init failed: {e}"))?);
 
         // Search client
         let search_config = SearchClientConfig {
-            url: std::env::var("ELASTICSEARCH_URL")
-                .unwrap_or_else(|_| "http://localhost:9200".to_string()),
+            url: std::env::var("ELASTICSEARCH_URL").unwrap_or_else(|_| "http://localhost:9200".to_string()),
             username: std::env::var("ELASTICSEARCH_USERNAME").ok(),
             password: std::env::var("ELASTICSEARCH_PASSWORD").ok(),
             timeout_seconds: 30,
             validate_certificates: true,
         };
-        let search_client = Arc::new(
-            SearchClient::new(search_config)
-                .map_err(|e| format!("Search client init failed: {e}"))?,
-        );
+        let search_client =
+            Arc::new(SearchClient::new(search_config).map_err(|e| format!("Search client init failed: {e}"))?);
 
         // Archival service
-        let archival_storage_path = std::env::var("ARCHIVAL_STORAGE_PATH")
-            .unwrap_or_else(|_| "/tmp/archives".to_string());
-        let archival_storage = Arc::new(FileSystemArchivalStorage::new(
-            std::path::PathBuf::from(archival_storage_path),
-        ));
+        let archival_storage_path =
+            std::env::var("ARCHIVAL_STORAGE_PATH").unwrap_or_else(|_| "/tmp/archives".to_string());
+        let archival_storage = Arc::new(FileSystemArchivalStorage::new(std::path::PathBuf::from(
+            archival_storage_path,
+        )));
         let archival_service = Arc::new(ArchivalService::new(archival_storage));
 
         Ok(Self {
@@ -140,8 +127,10 @@ pub mod fakes {
     use std::sync::Mutex;
 
     use crate::services::{
-        email::{EmailError, TransactionalEmail, DigestEmail},
-        notifications::{DeviceToken, NotificationError, NotificationPreference, PushNotification, ScheduledNotification},
+        email::{DigestEmail, EmailError, TransactionalEmail},
+        notifications::{
+            DeviceToken, NotificationError, NotificationPreference, PushNotification, ScheduledNotification,
+        },
         reporting::{Report, ReportError, ReportRequest, ReportTemplate, ScheduledReport},
         storage::{FileMetadata, SignedUrlRequest, StorageError, UploadRequest},
         verification::{Document, ParticipantVerification, VerificationChecklist},
@@ -155,7 +144,9 @@ pub mod fakes {
 
     impl FakeEmailService {
         pub fn new() -> Self {
-            Self { transactional: Mutex::new(vec![]) }
+            Self {
+                transactional: Mutex::new(vec![]),
+            }
         }
     }
 
@@ -183,7 +174,9 @@ pub mod fakes {
 
     impl FakeNotificationService {
         pub fn new() -> Self {
-            Self { sent: Mutex::new(vec![]) }
+            Self {
+                sent: Mutex::new(vec![]),
+            }
         }
     }
 
@@ -223,7 +216,9 @@ pub mod fakes {
 
     impl FakeStorageService {
         pub fn new() -> Self {
-            Self { uploads: Mutex::new(vec![]) }
+            Self {
+                uploads: Mutex::new(vec![]),
+            }
         }
     }
 
@@ -266,7 +261,9 @@ pub mod fakes {
 
     impl FakeReportService {
         pub fn new() -> Self {
-            Self { generated: Mutex::new(vec![]) }
+            Self {
+                generated: Mutex::new(vec![]),
+            }
         }
     }
 
@@ -319,7 +316,10 @@ pub mod fakes {
         }
     }
 
-    fn make_fake_verification(participant_id: &str, status: crate::services::verification::VerificationStatus) -> ParticipantVerification {
+    fn make_fake_verification(
+        participant_id: &str,
+        status: crate::services::verification::VerificationStatus,
+    ) -> ParticipantVerification {
         ParticipantVerification {
             participant_id: participant_id.to_string(),
             status,
@@ -342,9 +342,17 @@ pub mod fakes {
     #[async_trait::async_trait]
     impl VerificationService for FakeVerificationService {
         async fn start_verification(&self, participant_id: String) -> Result<ParticipantVerification, String> {
-            Ok(make_fake_verification(&participant_id, crate::services::verification::VerificationStatus::Pending))
+            Ok(make_fake_verification(
+                &participant_id,
+                crate::services::verification::VerificationStatus::Pending,
+            ))
         }
-        async fn submit_document(&self, participant_id: String, doc_type: String, url: String) -> Result<Document, String> {
+        async fn submit_document(
+            &self,
+            participant_id: String,
+            doc_type: String,
+            url: String,
+        ) -> Result<Document, String> {
             Ok(Document {
                 id: "fake-doc".to_string(),
                 participant_id,
@@ -367,9 +375,16 @@ pub mod fakes {
             })
         }
         async fn get_verification_status(&self, participant_id: String) -> Result<ParticipantVerification, String> {
-            Ok(make_fake_verification(&participant_id, crate::services::verification::VerificationStatus::Pending))
+            Ok(make_fake_verification(
+                &participant_id,
+                crate::services::verification::VerificationStatus::Pending,
+            ))
         }
-        async fn submit_checklist(&self, participant_id: String, checks: HashMap<String, bool>) -> Result<VerificationChecklist, String> {
+        async fn submit_checklist(
+            &self,
+            participant_id: String,
+            checks: HashMap<String, bool>,
+        ) -> Result<VerificationChecklist, String> {
             Ok(VerificationChecklist {
                 id: "fake-checklist".to_string(),
                 participant_id,
@@ -384,7 +399,12 @@ pub mod fakes {
             self.approvals.lock().unwrap().push(participant_id);
             Ok(())
         }
-        async fn reject_participant(&self, participant_id: String, _reason: String, _reviewer_id: String) -> Result<(), String> {
+        async fn reject_participant(
+            &self,
+            participant_id: String,
+            _reason: String,
+            _reviewer_id: String,
+        ) -> Result<(), String> {
             self.rejections.lock().unwrap().push(participant_id);
             Ok(())
         }
@@ -392,7 +412,10 @@ pub mod fakes {
             Ok(vec![])
         }
         async fn retry_verification(&self, participant_id: String) -> Result<ParticipantVerification, String> {
-            Ok(make_fake_verification(&participant_id, crate::services::verification::VerificationStatus::Pending))
+            Ok(make_fake_verification(
+                &participant_id,
+                crate::services::verification::VerificationStatus::Pending,
+            ))
         }
         async fn send_approval_notification(&self, _participant_id: String) -> Result<(), String> {
             Ok(())

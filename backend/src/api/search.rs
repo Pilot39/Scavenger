@@ -1,7 +1,7 @@
+use crate::search::{Facet, SearchClient, SearchFilter, SearchQueryBuilder, SearchRequest};
 use actix_web::{web, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use crate::search::{SearchClient, SearchQueryBuilder, SearchRequest, SearchFilter, Facet};
 use std::sync::Arc;
 
 /// Search API handlers
@@ -30,21 +30,21 @@ pub struct SearchResponse<T> {
 }
 
 /// Perform a search query
-pub async fn search(
-    client: web::Data<Arc<SearchClient>>,
-    params: web::Query<SearchParams>,
-) -> Result<HttpResponse> {
+pub async fn search(client: web::Data<Arc<SearchClient>>, params: web::Query<SearchParams>) -> Result<HttpResponse> {
     // Build the search query
     let query = SearchQueryBuilder::new()
-        .multi_match(vec!["title".to_string(), "description".to_string(), "content".to_string()], &params.q)
+        .multi_match(
+            vec!["title".to_string(), "description".to_string(), "content".to_string()],
+            &params.q,
+        )
         .from(params.from)
         .size(params.size)
         .highlight(vec!["title".to_string(), "description".to_string()])
         .build();
-    
+
     // Execute search
     let start = std::time::Instant::now();
-    
+
     // In a real implementation, you'd execute the query against Elasticsearch
     // For now, return a mock response
     let response = SearchResponse {
@@ -53,21 +53,14 @@ pub async fn search(
         took_ms: start.elapsed().as_millis() as u64,
         facets: None,
     };
-    
+
     Ok(HttpResponse::Ok().json(response))
 }
 
 /// Get search suggestions/autocomplete
-pub async fn suggest(
-    client: web::Data<Arc<SearchClient>>,
-    params: web::Query<SearchParams>,
-) -> Result<HttpResponse> {
-    let suggestions = vec![
-        "waste type A",
-        "waste type B",
-        "participant name",
-    ];
-    
+pub async fn suggest(client: web::Data<Arc<SearchClient>>, params: web::Query<SearchParams>) -> Result<HttpResponse> {
+    let suggestions = vec!["waste type A", "waste type B", "participant name"];
+
     Ok(HttpResponse::Ok().json(json!({
         "suggestions": suggestions
     })))

@@ -1,7 +1,7 @@
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplianceMetrics {
@@ -85,7 +85,11 @@ impl ComplianceMonitor {
         }
 
         let total = (passed + failed) as f64;
-        let score = if total > 0.0 { (passed as f64 / total) * 100.0 } else { 100.0 };
+        let score = if total > 0.0 {
+            (passed as f64 / total) * 100.0
+        } else {
+            100.0
+        };
 
         let report = ComplianceReport {
             id: uuid::Uuid::new_v4().to_string(),
@@ -129,13 +133,12 @@ impl ComplianceMonitor {
                     (CheckStatus::Pass, "Encryption check passed".to_string())
                 }
             }
-            Some("audit_logging_enabled") => {
-                (CheckStatus::Pass, "Audit logging is enabled".to_string())
-            }
-            Some("access_control_configured") => {
-                (CheckStatus::Pass, "Access control configured".to_string())
-            }
-            _ => (CheckStatus::Skipped, format!("No check function defined for {}", requirement.id)),
+            Some("audit_logging_enabled") => (CheckStatus::Pass, "Audit logging is enabled".to_string()),
+            Some("access_control_configured") => (CheckStatus::Pass, "Access control configured".to_string()),
+            _ => (
+                CheckStatus::Skipped,
+                format!("No check function defined for {}", requirement.id),
+            ),
         }
     }
 }
