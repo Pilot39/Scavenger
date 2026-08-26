@@ -1,11 +1,9 @@
 #![cfg(test)]
 
-use soroban_sdk::{testutils::Address as _, Address, Env, String, Symbol};
-use stellar_scavngr_contract::{
-    ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use stellar_scavngr_contract::{ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType};
 
-fn setup_full_ecosystem(env: &Env) -> (ScavengerContractClient, Address, Address, Address, Address) {
+fn setup_full_ecosystem(env: &Env) -> (ScavengerContractClient<'_>, Address, Address, Address, Address) {
     env.mock_all_auths();
     let contract_id = env.register_contract(None, ScavengerContract);
     let client = ScavengerContractClient::new(env, &contract_id);
@@ -322,7 +320,7 @@ fn test_global_statistics() {
     let recycler2 = Address::generate(&env);
     client.register_participant(&recycler2, &ParticipantRole::Recycler, &name, &0, &0);
 
-    let desc = String::from_str(&env, "Test");
+    let _desc = String::from_str(&env, "Test");
 
     // Multiple participants submit using new waste system
     client.recycle_waste(&WasteType::Plastic, &1000, &recycler, &0, &0);
@@ -398,7 +396,7 @@ fn test_confirmation_event_sequence() {
 
     // Transfer to collector
     client.transfer_waste_v2(&waste_id, &recycler, &collector, &0, &0);
-    
+
     // Manufacturer confirms (third party)
     client.confirm_waste_details(&waste_id, &manufacturer);
 

@@ -1,9 +1,7 @@
 #![cfg(test)]
 
 use soroban_sdk::{testutils::Address as _, Address, Env};
-use stellar_scavngr_contract::{
-    ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType};
 
 #[test]
 #[should_panic(expected = "Donation amount must be greater than zero")]
@@ -20,17 +18,12 @@ fn test_donate_zero_amount() {
         &donor,
         &ParticipantRole::Recycler,
         &soroban_sdk::symbol_short!("Donor"),
+        &45_000_000,
+        &-93_000_000,
         &0,
         &0,
     );
     client.set_charity_contract(&admin, &charity);
-    client.register_participant(
-        &donor,
-        &ParticipantRole::Manufacturer,
-        &soroban_sdk::symbol_short!("Donor"),
-        &45_000_000,
-        &-93_000_000,
-    );
     client.donate_to_charity(&donor, &0);
 }
 

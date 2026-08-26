@@ -10,7 +10,13 @@ fn test_incentive_creation_by_manufacturer() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Plastic, &50, &10000);
 
@@ -19,7 +25,7 @@ fn test_incentive_creation_by_manufacturer() {
     assert_eq!(incentive.reward_points, 50);
     assert_eq!(incentive.total_budget, 10000);
     assert_eq!(incentive.remaining_budget, 10000);
-    assert_eq!(incentive.active, true);
+    assert!(incentive.active);
 }
 
 #[test]
@@ -47,7 +53,13 @@ fn test_non_manufacturer_creation_fails_collector() {
     let collector = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&collector, &ParticipantRole::Collector, &symbol_short!("Col"), &100, &200);
+    client.register_participant(
+        &collector,
+        &ParticipantRole::Collector,
+        &symbol_short!("Col"),
+        &100,
+        &200,
+    );
 
     client.create_incentive(&collector, &WasteType::Metal, &30, &5000);
 }
@@ -74,7 +86,13 @@ fn test_incentive_update() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Glass, &40, &8000);
 
@@ -83,7 +101,7 @@ fn test_incentive_update() {
     assert_eq!(updated.reward_points, 60);
     assert_eq!(updated.total_budget, 12000);
     assert_eq!(updated.remaining_budget, 12000);
-    assert_eq!(updated.active, true);
+    assert!(updated.active);
 }
 
 #[test]
@@ -108,7 +126,13 @@ fn test_update_with_zero_reward_fails() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Metal, &40, &8000);
 
@@ -125,7 +149,13 @@ fn test_update_with_zero_budget_fails() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Paper, &30, &5000);
 
@@ -141,15 +171,21 @@ fn test_incentive_deactivation() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Plastic, &50, &10000);
 
-    assert_eq!(incentive.active, true);
+    assert!(incentive.active);
 
     let deactivated = client.deactivate_incentive(&incentive.id, &manufacturer);
 
-    assert_eq!(deactivated.active, false);
+    assert!(!deactivated.active);
     assert_eq!(deactivated.id, incentive.id);
 }
 
@@ -164,8 +200,20 @@ fn test_deactivation_by_non_creator_fails() {
     let manufacturer2 = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer1, &ParticipantRole::Manufacturer, &symbol_short!("Mfr1"), &100, &200);
-    client.register_participant(&manufacturer2, &ParticipantRole::Manufacturer, &symbol_short!("Mfr2"), &300, &400);
+    client.register_participant(
+        &manufacturer1,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr1"),
+        &100,
+        &200,
+    );
+    client.register_participant(
+        &manufacturer2,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr2"),
+        &300,
+        &400,
+    );
 
     let incentive = client.create_incentive(&manufacturer1, &WasteType::Metal, &40, &8000);
 
@@ -182,7 +230,13 @@ fn test_deactivate_nonexistent_incentive_fails() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     client.deactivate_incentive(&999, &manufacturer);
 }
@@ -196,7 +250,13 @@ fn test_multiple_incentives_per_manufacturer() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive1 = client.create_incentive(&manufacturer, &WasteType::Plastic, &50, &10000);
     let incentive2 = client.create_incentive(&manufacturer, &WasteType::Metal, &40, &8000);
@@ -221,8 +281,20 @@ fn test_multiple_manufacturers_same_waste_type() {
     let manufacturer2 = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer1, &ParticipantRole::Manufacturer, &symbol_short!("Mfr1"), &100, &200);
-    client.register_participant(&manufacturer2, &ParticipantRole::Manufacturer, &symbol_short!("Mfr2"), &300, &400);
+    client.register_participant(
+        &manufacturer1,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr1"),
+        &100,
+        &200,
+    );
+    client.register_participant(
+        &manufacturer2,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr2"),
+        &300,
+        &400,
+    );
 
     let incentive1 = client.create_incentive(&manufacturer1, &WasteType::Plastic, &50, &10000);
     let incentive2 = client.create_incentive(&manufacturer2, &WasteType::Plastic, &60, &12000);
@@ -242,7 +314,13 @@ fn test_get_incentive_by_id() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let created = client.create_incentive(&manufacturer, &WasteType::Paper, &35, &7000);
 
@@ -278,8 +356,20 @@ fn test_get_incentives_by_waste_type() {
     let manufacturer2 = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer1, &ParticipantRole::Manufacturer, &symbol_short!("Mfr1"), &100, &200);
-    client.register_participant(&manufacturer2, &ParticipantRole::Manufacturer, &symbol_short!("Mfr2"), &300, &400);
+    client.register_participant(
+        &manufacturer1,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr1"),
+        &100,
+        &200,
+    );
+    client.register_participant(
+        &manufacturer2,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr2"),
+        &300,
+        &400,
+    );
 
     client.create_incentive(&manufacturer1, &WasteType::Plastic, &50, &10000);
     client.create_incentive(&manufacturer2, &WasteType::Plastic, &60, &12000);
@@ -300,7 +390,13 @@ fn test_get_active_incentives() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive1 = client.create_incentive(&manufacturer, &WasteType::Plastic, &50, &10000);
     let incentive2 = client.create_incentive(&manufacturer, &WasteType::Metal, &40, &8000);
@@ -311,7 +407,7 @@ fn test_get_active_incentives() {
 
     assert_eq!(active.len(), 1);
     assert_eq!(active.get(0).unwrap().id, incentive2.id);
-    assert_eq!(active.get(0).unwrap().active, true);
+    assert!(active.get(0).unwrap().active);
 }
 
 #[test]
@@ -323,12 +419,20 @@ fn test_get_active_mfr_incentive() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     client.create_incentive(&manufacturer, &WasteType::Plastic, &50, &10000);
     client.create_incentive(&manufacturer, &WasteType::Plastic, &70, &15000);
 
-    let best = client.get_active_mfr_incentive(&manufacturer, &WasteType::Plastic).unwrap();
+    let best = client
+        .get_active_mfr_incentive(&manufacturer, &WasteType::Plastic)
+        .unwrap();
 
     assert_eq!(best.reward_points, 70);
     assert_eq!(best.waste_type, WasteType::Plastic);
@@ -343,7 +447,13 @@ fn test_get_active_mfr_incentive_returns_none_when_no_match() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     client.create_incentive(&manufacturer, &WasteType::Plastic, &50, &10000);
 
@@ -361,7 +471,13 @@ fn test_deactivated_incentive_not_in_active_query() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Glass, &45, &9000);
 
@@ -382,7 +498,13 @@ fn test_update_deactivated_incentive_fails() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Paper, &30, &6000);
 
@@ -400,15 +522,21 @@ fn test_incentive_status_update() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Metal, &55, &11000);
 
-    assert_eq!(incentive.active, true);
+    assert!(incentive.active);
 
     let deactivated = client.update_incentive_status(&incentive.id, &false);
-    assert_eq!(deactivated.active, false);
+    assert!(!deactivated.active);
 
     let reactivated = client.update_incentive_status(&incentive.id, &true);
-    assert_eq!(reactivated.active, true);
+    assert!(reactivated.active);
 }

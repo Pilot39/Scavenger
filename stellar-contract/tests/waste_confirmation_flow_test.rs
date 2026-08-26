@@ -1,4 +1,8 @@
-use soroban_sdk::{symbol_short, testutils::{Address as _, Events}, Address, Env, IntoVal, Vec};
+use soroban_sdk::{
+    symbol_short,
+    testutils::{Address as _, Events},
+    Address, Env, IntoVal, Vec,
+};
 use stellar_scavngr_contract::{ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType};
 
 #[test]
@@ -12,16 +16,22 @@ fn test_successful_confirmation() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Plastic, &2500, &recycler, &40_000_000, &-74_000_000);
 
     let waste_before = client.get_waste_v2(&waste_id).unwrap();
-    assert_eq!(waste_before.is_confirmed, false);
+    assert!(!waste_before.is_confirmed);
 
     let confirmed_waste = client.confirm_waste_details(&waste_id, &confirmer);
 
-    assert_eq!(confirmed_waste.is_confirmed, true);
+    assert!(confirmed_waste.is_confirmed);
     assert_eq!(confirmed_waste.confirmer, confirmer);
 }
 
@@ -55,8 +65,20 @@ fn test_double_confirmation_fails() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer1, &ParticipantRole::Collector, &symbol_short!("C1"), &300, &400);
-    client.register_participant(&confirmer2, &ParticipantRole::Collector, &symbol_short!("C2"), &500, &600);
+    client.register_participant(
+        &confirmer1,
+        &ParticipantRole::Collector,
+        &symbol_short!("C1"),
+        &300,
+        &400,
+    );
+    client.register_participant(
+        &confirmer2,
+        &ParticipantRole::Collector,
+        &symbol_short!("C2"),
+        &500,
+        &600,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Glass, &1500, &recycler, &40_000_000, &-74_000_000);
 
@@ -75,18 +97,24 @@ fn test_reset_by_owner() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Paper, &2000, &recycler, &40_000_000, &-74_000_000);
 
     client.confirm_waste_details(&waste_id, &confirmer);
 
     let waste_confirmed = client.get_waste_v2(&waste_id).unwrap();
-    assert_eq!(waste_confirmed.is_confirmed, true);
+    assert!(waste_confirmed.is_confirmed);
 
     let reset_waste = client.reset_waste_confirmation(&waste_id, &recycler);
 
-    assert_eq!(reset_waste.is_confirmed, false);
+    assert!(!reset_waste.is_confirmed);
     assert_eq!(reset_waste.confirmer, recycler);
 }
 
@@ -103,7 +131,13 @@ fn test_reset_by_non_owner_fails() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
     client.register_participant(&attacker, &ParticipantRole::Recycler, &symbol_short!("Att"), &500, &600);
 
     let waste_id = client.recycle_waste(&WasteType::Plastic, &2500, &recycler, &40_000_000, &-74_000_000);
@@ -124,23 +158,29 @@ fn test_reconfirmation_after_reset() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Metal, &3000, &recycler, &40_000_000, &-74_000_000);
 
     // First confirmation
     client.confirm_waste_details(&waste_id, &confirmer);
     let waste_after_confirm = client.get_waste_v2(&waste_id).unwrap();
-    assert_eq!(waste_after_confirm.is_confirmed, true);
+    assert!(waste_after_confirm.is_confirmed);
 
     // Reset
     client.reset_waste_confirmation(&waste_id, &recycler);
     let waste_after_reset = client.get_waste_v2(&waste_id).unwrap();
-    assert_eq!(waste_after_reset.is_confirmed, false);
+    assert!(!waste_after_reset.is_confirmed);
 
     // Re-confirm
     let reconfirmed_waste = client.confirm_waste_details(&waste_id, &confirmer);
-    assert_eq!(reconfirmed_waste.is_confirmed, true);
+    assert!(reconfirmed_waste.is_confirmed);
     assert_eq!(reconfirmed_waste.confirmer, confirmer);
 }
 
@@ -175,7 +215,13 @@ fn test_confirm_deactivated_waste_fails() {
 
     client.initialize_admin(&admin);
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Paper, &2000, &recycler, &40_000_000, &-74_000_000);
 
@@ -195,7 +241,13 @@ fn test_confirmation_event_emission() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Plastic, &2500, &recycler, &40_000_000, &-74_000_000);
 
@@ -204,10 +256,7 @@ fn test_confirmation_event_emission() {
     let events = env.events().all();
     let event = events.last().unwrap();
 
-    let expected_topics: Vec<soroban_sdk::Val> = (
-        symbol_short!("confirmed"),
-        waste_id,
-    ).into_val(&env);
+    let expected_topics: Vec<soroban_sdk::Val> = (symbol_short!("confirmed"), waste_id).into_val(&env);
 
     assert_eq!(event.0, contract_id);
     assert_eq!(event.1, expected_topics);
@@ -224,7 +273,13 @@ fn test_reset_event_emission() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Metal, &3000, &recycler, &40_000_000, &-74_000_000);
 
@@ -234,10 +289,7 @@ fn test_reset_event_emission() {
     let events = env.events().all();
     let event = events.last().unwrap();
 
-    let expected_topics: Vec<soroban_sdk::Val> = (
-        symbol_short!("reset"),
-        waste_id,
-    ).into_val(&env);
+    let expected_topics: Vec<soroban_sdk::Val> = (symbol_short!("reset"), waste_id).into_val(&env);
 
     assert_eq!(event.0, contract_id);
     assert_eq!(event.1, expected_topics);
@@ -254,27 +306,33 @@ fn test_multiple_reset_confirm_cycles() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Glass, &1500, &recycler, &40_000_000, &-74_000_000);
 
     // Cycle 1
     client.confirm_waste_details(&waste_id, &confirmer);
-    assert_eq!(client.get_waste_v2(&waste_id).unwrap().is_confirmed, true);
-    
+    assert!(client.get_waste_v2(&waste_id).unwrap().is_confirmed);
+
     client.reset_waste_confirmation(&waste_id, &recycler);
-    assert_eq!(client.get_waste_v2(&waste_id).unwrap().is_confirmed, false);
+    assert!(!client.get_waste_v2(&waste_id).unwrap().is_confirmed);
 
     // Cycle 2
     client.confirm_waste_details(&waste_id, &confirmer);
-    assert_eq!(client.get_waste_v2(&waste_id).unwrap().is_confirmed, true);
-    
+    assert!(client.get_waste_v2(&waste_id).unwrap().is_confirmed);
+
     client.reset_waste_confirmation(&waste_id, &recycler);
-    assert_eq!(client.get_waste_v2(&waste_id).unwrap().is_confirmed, false);
+    assert!(!client.get_waste_v2(&waste_id).unwrap().is_confirmed);
 
     // Cycle 3
     client.confirm_waste_details(&waste_id, &confirmer);
-    assert_eq!(client.get_waste_v2(&waste_id).unwrap().is_confirmed, true);
+    assert!(client.get_waste_v2(&waste_id).unwrap().is_confirmed);
 }
 
 #[test]
@@ -289,8 +347,20 @@ fn test_confirmer_updates_correctly() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&confirmer1, &ParticipantRole::Collector, &symbol_short!("C1"), &300, &400);
-    client.register_participant(&confirmer2, &ParticipantRole::Collector, &symbol_short!("C2"), &500, &600);
+    client.register_participant(
+        &confirmer1,
+        &ParticipantRole::Collector,
+        &symbol_short!("C1"),
+        &300,
+        &400,
+    );
+    client.register_participant(
+        &confirmer2,
+        &ParticipantRole::Collector,
+        &symbol_short!("C2"),
+        &500,
+        &600,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Paper, &2000, &recycler, &40_000_000, &-74_000_000);
 
@@ -314,7 +384,13 @@ fn test_confirm_nonexistent_waste_fails() {
     let confirmer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&confirmer, &ParticipantRole::Collector, &symbol_short!("Con"), &300, &400);
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Collector,
+        &symbol_short!("Con"),
+        &300,
+        &400,
+    );
 
     client.confirm_waste_details(&999, &confirmer);
 }

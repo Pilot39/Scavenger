@@ -1,10 +1,8 @@
 #![cfg(test)]
 use soroban_sdk::{testutils::Address as _, Address, Env};
-use stellar_scavngr_contract::{
-    ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType};
 
-fn create_test_contract(env: &Env) -> (ScavengerContractClient, Address) {
+fn create_test_contract(env: &Env) -> (ScavengerContractClient<'_>, Address) {
     let contract_id = env.register_contract(None, ScavengerContract);
     let client = ScavengerContractClient::new(env, &contract_id);
 
@@ -33,19 +31,13 @@ fn test_deactivate_waste() {
     );
 
     // Register waste
-    let waste_id = client.recycle_waste(
-        &WasteType::Plastic,
-        &1000,
-        &owner,
-        &45_000_000,
-        &-93_000_000,
-    );
+    let waste_id = client.recycle_waste(&WasteType::Plastic, &1000, &owner, &45_000_000, &-93_000_000);
 
     // Deactivate waste as admin
     let deactivated = client.deactivate_waste(&waste_id, &admin);
 
     // Verify waste is deactivated
-    assert_eq!(deactivated.is_active, false);
+    assert!(!deactivated.is_active);
     assert_eq!(deactivated.waste_id, waste_id);
 }
 
@@ -70,13 +62,7 @@ fn test_deactivate_waste_non_admin() {
     );
 
     // Register waste
-    let waste_id = client.recycle_waste(
-        &WasteType::Plastic,
-        &1000,
-        &owner,
-        &45_000_000,
-        &-93_000_000,
-    );
+    let waste_id = client.recycle_waste(&WasteType::Plastic, &1000, &owner, &45_000_000, &-93_000_000);
 
     // Try to deactivate as non-admin (should panic)
     client.deactivate_waste(&waste_id, &non_admin);
@@ -102,13 +88,7 @@ fn test_deactivate_already_deactivated_waste() {
     );
 
     // Register waste
-    let waste_id = client.recycle_waste(
-        &WasteType::Plastic,
-        &1000,
-        &owner,
-        &45_000_000,
-        &-93_000_000,
-    );
+    let waste_id = client.recycle_waste(&WasteType::Plastic, &1000, &owner, &45_000_000, &-93_000_000);
 
     // Deactivate waste
     client.deactivate_waste(&waste_id, &admin);
@@ -148,15 +128,9 @@ fn test_deactivated_waste_not_counted_in_totals() {
     );
 
     // Register two waste items
-    let waste1 = client.recycle_waste(
-        &WasteType::Plastic,
-        &1000,
-        &owner,
-        &45_000_000,
-        &-93_000_000,
-    );
+    let waste1 = client.recycle_waste(&WasteType::Plastic, &1000, &owner, &45_000_000, &-93_000_000);
 
-    let waste2 = client.recycle_waste(&WasteType::Metal, &2000, &owner, &45_000_000, &-93_000_000);
+    let _waste2 = client.recycle_waste(&WasteType::Metal, &2000, &owner, &45_000_000, &-93_000_000);
 
     // Get initial stats
     let initial_stats = client.get_supply_chain_stats();
@@ -205,13 +179,7 @@ fn test_deactivated_waste_cannot_be_transferred() {
     );
 
     // Register waste
-    let waste_id = client.recycle_waste(
-        &WasteType::Plastic,
-        &1000,
-        &owner,
-        &45_000_000,
-        &-93_000_000,
-    );
+    let waste_id = client.recycle_waste(&WasteType::Plastic, &1000, &owner, &45_000_000, &-93_000_000);
 
     // Deactivate waste
     client.deactivate_waste(&waste_id, &admin);
@@ -241,13 +209,7 @@ fn test_deactivated_waste_cannot_be_confirmed() {
     );
 
     // Register waste
-    let waste_id = client.recycle_waste(
-        &WasteType::Plastic,
-        &1000,
-        &owner,
-        &45_000_000,
-        &-93_000_000,
-    );
+    let waste_id = client.recycle_waste(&WasteType::Plastic, &1000, &owner, &45_000_000, &-93_000_000);
 
     // Deactivate waste
     client.deactivate_waste(&waste_id, &admin);

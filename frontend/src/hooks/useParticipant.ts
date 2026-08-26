@@ -21,6 +21,7 @@ export function useParticipant() {
       return client.getParticipant(address)
     },
     enabled: !!address,
+    retry: false,
   })
 
   return {

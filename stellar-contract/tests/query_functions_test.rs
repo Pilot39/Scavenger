@@ -20,7 +20,7 @@ fn test_get_waste_v2() {
     assert_eq!(waste.waste_type, WasteType::Plastic);
     assert_eq!(waste.weight, 2500);
     assert_eq!(waste.current_owner, recycler);
-    assert_eq!(waste.is_active, true);
+    assert!(waste.is_active);
 }
 
 #[test]
@@ -54,9 +54,9 @@ fn test_get_participant_wastes() {
     let wastes = client.get_participant_wastes_v2(&recycler);
 
     assert_eq!(wastes.len(), 3);
-    assert!(wastes.contains(&waste1));
-    assert!(wastes.contains(&waste2));
-    assert!(wastes.contains(&waste3));
+    assert!(wastes.contains(waste1));
+    assert!(wastes.contains(waste2));
+    assert!(wastes.contains(waste3));
 }
 
 #[test]
@@ -87,8 +87,20 @@ fn test_get_waste_transfer_history() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&collector, &ParticipantRole::Collector, &symbol_short!("Col"), &300, &400);
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &500, &600);
+    client.register_participant(
+        &collector,
+        &ParticipantRole::Collector,
+        &symbol_short!("Col"),
+        &300,
+        &400,
+    );
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &500,
+        &600,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Paper, &2000, &recycler, &40_000_000, &-74_000_000);
 
@@ -133,7 +145,12 @@ fn test_get_participant_info() {
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
 
-    let material = client.submit_material(&WasteType::Plastic, &3000, &recycler, &soroban_sdk::String::from_str(&env, "test"));
+    let material = client.submit_material(
+        &WasteType::Plastic,
+        &3000,
+        &recycler,
+        &soroban_sdk::String::from_str(&env, "test"),
+    );
     client.verify_material(&material.id, &recycler);
 
     let info = client.get_participant_info(&recycler).unwrap();
@@ -168,8 +185,20 @@ fn test_get_incentives_by_waste_type() {
     let manufacturer2 = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer1, &ParticipantRole::Manufacturer, &symbol_short!("M1"), &100, &200);
-    client.register_participant(&manufacturer2, &ParticipantRole::Manufacturer, &symbol_short!("M2"), &300, &400);
+    client.register_participant(
+        &manufacturer1,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("M1"),
+        &100,
+        &200,
+    );
+    client.register_participant(
+        &manufacturer2,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("M2"),
+        &300,
+        &400,
+    );
 
     client.create_incentive(&manufacturer1, &WasteType::Plastic, &50, &10000);
     client.create_incentive(&manufacturer2, &WasteType::Plastic, &60, &12000);
@@ -203,7 +232,13 @@ fn test_get_incentive_by_id() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let created = client.create_incentive(&manufacturer, &WasteType::Paper, &35, &7000);
 
@@ -238,13 +273,21 @@ fn test_get_active_mfr_incentive() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     client.create_incentive(&manufacturer, &WasteType::Plastic, &50, &10000);
     client.create_incentive(&manufacturer, &WasteType::Plastic, &70, &15000);
     client.create_incentive(&manufacturer, &WasteType::Plastic, &60, &12000);
 
-    let best = client.get_active_mfr_incentive(&manufacturer, &WasteType::Plastic).unwrap();
+    let best = client
+        .get_active_mfr_incentive(&manufacturer, &WasteType::Plastic)
+        .unwrap();
 
     assert_eq!(best.reward_points, 70);
     assert_eq!(best.waste_type, WasteType::Plastic);
@@ -259,7 +302,13 @@ fn test_get_active_mfr_incentive_none() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let result = client.get_active_mfr_incentive(&manufacturer, &WasteType::Metal);
 
@@ -275,7 +324,13 @@ fn test_get_active_incentives() {
     let manufacturer = Address::generate(&env);
     env.mock_all_auths();
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &100, &200);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &100,
+        &200,
+    );
 
     let incentive1 = client.create_incentive(&manufacturer, &WasteType::Plastic, &50, &10000);
     let incentive2 = client.create_incentive(&manufacturer, &WasteType::Metal, &40, &8000);
@@ -302,12 +357,23 @@ fn test_get_supply_chain_stats() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&submitter, &ParticipantRole::Recycler, &symbol_short!("Sub"), &300, &400);
+    client.register_participant(
+        &submitter,
+        &ParticipantRole::Recycler,
+        &symbol_short!("Sub"),
+        &300,
+        &400,
+    );
 
     client.recycle_waste(&WasteType::Plastic, &2500, &recycler, &40_000_000, &-74_000_000);
     client.recycle_waste(&WasteType::Metal, &3000, &recycler, &41_000_000, &-75_000_000);
 
-    let material = client.submit_material(&WasteType::Glass, &4000, &submitter, &soroban_sdk::String::from_str(&env, "test"));
+    let material = client.submit_material(
+        &WasteType::Glass,
+        &4000,
+        &submitter,
+        &soroban_sdk::String::from_str(&env, "test"),
+    );
     client.verify_material(&material.id, &recycler);
 
     let (total_wastes, total_weight, total_tokens) = client.get_supply_chain_stats();
@@ -350,7 +416,7 @@ fn test_get_participant() {
     assert_eq!(participant.name, symbol_short!("Rec"));
     assert_eq!(participant.latitude, 100);
     assert_eq!(participant.longitude, 200);
-    assert_eq!(participant.is_registered, true);
+    assert!(participant.is_registered);
 }
 
 #[test]
@@ -378,10 +444,26 @@ fn test_get_stats() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&submitter, &ParticipantRole::Recycler, &symbol_short!("Sub"), &300, &400);
+    client.register_participant(
+        &submitter,
+        &ParticipantRole::Recycler,
+        &symbol_short!("Sub"),
+        &300,
+        &400,
+    );
 
-    let material1 = client.submit_material(&WasteType::Plastic, &3000, &submitter, &soroban_sdk::String::from_str(&env, "test1"));
-    let material2 = client.submit_material(&WasteType::Metal, &2000, &submitter, &soroban_sdk::String::from_str(&env, "test2"));
+    let material1 = client.submit_material(
+        &WasteType::Plastic,
+        &3000,
+        &submitter,
+        &soroban_sdk::String::from_str(&env, "test1"),
+    );
+    let _material2 = client.submit_material(
+        &WasteType::Metal,
+        &2000,
+        &submitter,
+        &soroban_sdk::String::from_str(&env, "test2"),
+    );
 
     client.verify_material(&material1.id, &recycler);
 
@@ -421,7 +503,13 @@ fn test_query_performance_multiple_wastes() {
 
     // Create 10 wastes
     for i in 0..10 {
-        client.recycle_waste(&WasteType::Plastic, &(2500 + i * 100), &recycler, &40_000_000, &-74_000_000);
+        client.recycle_waste(
+            &WasteType::Plastic,
+            &(2500 + i * 100),
+            &recycler,
+            &40_000_000,
+            &-74_000_000,
+        );
     }
 
     let wastes = client.get_participant_wastes_v2(&recycler);
@@ -440,7 +528,13 @@ fn test_query_after_transfer() {
     env.mock_all_auths();
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
-    client.register_participant(&collector, &ParticipantRole::Collector, &symbol_short!("Col"), &300, &400);
+    client.register_participant(
+        &collector,
+        &ParticipantRole::Collector,
+        &symbol_short!("Col"),
+        &300,
+        &400,
+    );
 
     let waste_id = client.recycle_waste(&WasteType::Paper, &2000, &recycler, &40_000_000, &-74_000_000);
 
@@ -465,7 +559,12 @@ fn test_get_waste_by_id_v1() {
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
 
-    let material = client.submit_material(&WasteType::Metal, &3000, &recycler, &soroban_sdk::String::from_str(&env, "test"));
+    let material = client.submit_material(
+        &WasteType::Metal,
+        &3000,
+        &recycler,
+        &soroban_sdk::String::from_str(&env, "test"),
+    );
 
     let retrieved = client.get_waste(&material.id).unwrap();
 
@@ -487,6 +586,6 @@ fn test_is_participant_registered() {
 
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &100, &200);
 
-    assert_eq!(client.is_participant_registered(&recycler), true);
-    assert_eq!(client.is_participant_registered(&unregistered), false);
+    assert!(client.is_participant_registered(&recycler));
+    assert!(!client.is_participant_registered(&unregistered));
 }

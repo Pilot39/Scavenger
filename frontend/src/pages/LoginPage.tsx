@@ -64,7 +64,7 @@ export function LoginPage() {
       })
       .catch(() => setIsRegistered(false))
       .finally(() => setChecking(false))
-  }, [address])
+  }, [address, login, navigate])
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -104,14 +104,18 @@ export function LoginPage() {
               {walletLoading ? 'Connecting…' : 'Connect Wallet'}
             </Button>
             {walletError && (
-              <p className="text-center text-sm text-destructive">{walletError}</p>
+              <p role="alert" aria-live="assertive" className="text-center text-sm text-destructive">
+                {walletError}
+              </p>
             )}
           </div>
         )}
 
         {/* Checking registration */}
         {isConnected && checking && (
-          <p className="text-center text-sm text-muted-foreground">Checking registration…</p>
+          <p role="status" aria-live="polite" className="text-center text-sm text-muted-foreground">
+            Checking registration…
+          </p>
         )}
 
         {/* Step 2: Registration form (not yet registered) */}
@@ -122,19 +126,25 @@ export function LoginPage() {
             </p>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium">Display name</label>
+              <label htmlFor="display-name-input" className="text-sm font-medium">
+                Display name
+              </label>
               <Input
+                id="display-name-input"
                 placeholder="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                autoFocus
                 required
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium">Role</label>
+              <label htmlFor="role-select-trigger" className="text-sm font-medium">
+                Role
+              </label>
               <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="role-select-trigger" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,7 +158,9 @@ export function LoginPage() {
             </div>
 
             {registerMutation.isError && (
-              <p className="text-sm text-destructive">{registerMutation.error?.message ?? 'Registration failed. Please try again.'}</p>
+              <p role="alert" aria-live="assertive" className="text-sm text-destructive">
+                {registerMutation.error?.message ?? 'Registration failed. Please try again.'}
+              </p>
             )}
 
             <Button type="submit" className="w-full" disabled={registerMutation.isPending || !name.trim()}>
