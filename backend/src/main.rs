@@ -104,11 +104,29 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(cors)
+            // ── Middleware ordering (documented per #1094) ────────────────────
+            // Order matters: actix-web applies middleware in *reverse* registration
+            // order on the way in (outermost first) and *forward* order on the way
+            // out.  The sequence below guarantees that `RequestIdMiddleware` is the
+            // very first middleware to run on the inbound path, so that a request ID
+            // is present in the request extensions before any downstream middleware
+            // (rate-limit, CSRF, validation, idempotency) can short-circuit with an
+            // early error response.
+            //
+            // Inbound execution order (first → last):
+            //   1. RequestIdMiddleware    — assign / echo x-request-id
+            //   2. ValidationMiddleware  — reject malformed Content-Type / payloads
+            //   3. RateLimitMiddleware   — reject over-quota requests (429)
+            //   4. CsrfMiddleware        — reject CSRF violations (403)
+            //   5. IdempotencyMiddleware — deduplicate write operations
+            //   (application handlers)
+            //
+            // Because actix-web wraps in reverse, RequestIdMiddleware must be
+            // registered *last* in the `.wrap()` chain so it executes *first*.
+            .wrap(IdempotencyMiddleware::new())
             .wrap(RateLimitMiddleware::new(rate_limit_config.clone()))
             .wrap(ValidationMiddleware)
             .wrap(RequestIdMiddleware)
-            // #919: idempotency key deduplication for write operations
-            .wrap(IdempotencyMiddleware::new())
             .app_data(web::Data::new(email_service.clone()))
             .app_data(web::Data::new(notification_service.clone()))
             .app_data(web::Data::new(reporting_service.clone()))

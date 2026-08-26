@@ -321,6 +321,26 @@ impl ArchivalService {
         Ok(result)
     }
 
+    // ─── Storage-path helpers ─────────────────────────────────────────────────
+
+    /// Build the canonical storage path for an archive entry.
+    ///
+    /// **Single source of truth** for all path/key-naming logic used by this
+    /// service.  Both `archive_data` and any future storage back-ends must go
+    /// through this method so path construction is never duplicated.
+    ///
+    /// Format: `archives/<data_type>/<YYYY>/<MM>/<DD>/<data_id>`
+    pub fn build_storage_path(data_type: &str, data_id: &str) -> String {
+        format!(
+            "archives/{}/{}/{}",
+            data_type,
+            Utc::now().format("%Y/%m/%d"),
+            data_id
+        )
+    }
+
+    // ─── Archival operations ──────────────────────────────────────────────────
+
     /// Archive data
     pub async fn archive_data(
         &self,
@@ -331,8 +351,8 @@ impl ArchivalService {
     ) -> Result<String> {
         let policy = self.get_policy(&policy_id)?;
 
-        // Generate storage path
-        let storage_path = format!("archives/{}/{}/{}", data_type, Utc::now().format("%Y/%m/%d"), data_id);
+        // Generate storage path via the canonical helper (single source of truth).
+        let storage_path = Self::build_storage_path(&data_type, &data_id);
 
         // Compress data
         let compressed_data = self.compress_data(&data)?;
