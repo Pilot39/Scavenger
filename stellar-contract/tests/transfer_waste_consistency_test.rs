@@ -7,7 +7,7 @@
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, String};
 use stellar_scavngr_contract::{ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType};
 
-fn setup(env: &Env) -> (ScavengerContractClient, Address, Address, Address) {
+fn setup(env: &Env) -> (ScavengerContractClient<'_>, Address, Address, Address) {
     let contract_id = env.register_contract(None, ScavengerContract);
     let client = ScavengerContractClient::new(env, &contract_id);
     let recycler = Address::generate(env);
@@ -16,7 +16,13 @@ fn setup(env: &Env) -> (ScavengerContractClient, Address, Address, Address) {
     env.mock_all_auths();
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &0, &0);
     client.register_participant(&collector, &ParticipantRole::Collector, &symbol_short!("Col"), &0, &0);
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &0, &0);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &0,
+        &0,
+    );
     (client, recycler, collector, manufacturer)
 }
 
@@ -145,6 +151,6 @@ fn test_v2_updates_participant_wastes_index() {
     let recycler_wastes = client.get_participant_wastes_v2(&recycler);
     let collector_wastes = client.get_participant_wastes_v2(&collector);
 
-    assert!(!recycler_wastes.contains(&waste_id));
-    assert!(collector_wastes.contains(&waste_id));
+    assert!(!recycler_wastes.contains(waste_id));
+    assert!(collector_wastes.contains(waste_id));
 }

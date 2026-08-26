@@ -11,7 +11,13 @@ fn setup(env: &Env) -> (ScavengerContractClient<'_>, Address, Address, Address) 
     let manufacturer = Address::generate(env);
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("r"), &0, &0);
     client.register_participant(&collector, &ParticipantRole::Collector, &symbol_short!("c"), &0, &0);
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("m"), &0, &0);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("m"),
+        &0,
+        &0,
+    );
     (client, recycler, collector, manufacturer)
 }
 

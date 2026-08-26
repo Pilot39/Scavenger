@@ -1,5 +1,5 @@
 [workspace]
-members = ["stellar-contract"]
+members = ["stellar-contract", "backend"]
 resolver = "2"
 
 [workspace.package]

@@ -1,6 +1,5 @@
 #![cfg(test)]
 
-
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Events},
@@ -27,13 +26,7 @@ fn register_and_fund_donor(client: &ScavengerContractClient<'_>, env: &Env, admi
     let donor = Address::generate(env);
 
     client.set_token_address(admin, &token_address);
-    client.register_participant(
-        &donor,
-        &ParticipantRole::Recycler,
-        &symbol_short!("donor"),
-        &100,
-        &200,
-    );
+    client.register_participant(&donor, &ParticipantRole::Recycler, &symbol_short!("donor"), &100, &200);
     client.reward_tokens(&rewarder, &donor, &1_000, &1);
 
     donor

@@ -1,7 +1,5 @@
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
-use stellar_scavngr_contract::{
-    ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, ScavengerContract, ScavengerContractClient, WasteType};
 
 #[test]
 fn test_get_incentives_by_rewarder_empty() {
@@ -136,7 +134,7 @@ fn test_get_incentives_by_rewarder_multiple_manufacturers() {
     let incentives1 = client.get_incentives_by_rewarder(&manufacturer1);
     assert_eq!(incentives1.len(), 2);
     assert!(incentives1.iter().all(|i| i.rewarder == manufacturer1));
-    
+
     let mut has_id1 = false;
     let mut has_id2 = false;
     for incentive in incentives1.iter() {
@@ -154,7 +152,7 @@ fn test_get_incentives_by_rewarder_multiple_manufacturers() {
     let incentives2 = client.get_incentives_by_rewarder(&manufacturer2);
     assert_eq!(incentives2.len(), 2);
     assert!(incentives2.iter().all(|i| i.rewarder == manufacturer2));
-    
+
     let mut has_id3 = false;
     let mut has_id4 = false;
     for incentive in incentives2.iter() {
@@ -234,8 +232,7 @@ fn test_get_incentives_by_rewarder_returns_full_structs() {
         &200,
     );
 
-    let created_incentive =
-        client.create_incentive(&manufacturer, &WasteType::Plastic, &100, &10000);
+    let created_incentive = client.create_incentive(&manufacturer, &WasteType::Plastic, &100, &10000);
 
     let incentives = client.get_incentives_by_rewarder(&manufacturer);
     assert_eq!(incentives.len(), 1);
@@ -368,6 +365,7 @@ fn test_get_incentives_by_rewarder_all_waste_types() {
             WasteType::Paper => has_paper = true,
             WasteType::Glass => has_glass = true,
             WasteType::PetPlastic => has_pet_plastic = true,
+            WasteType::Organic | WasteType::Electronic => {}
         }
     }
 

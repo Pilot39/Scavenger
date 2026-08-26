@@ -26,7 +26,13 @@ fn test_zero_weight_waste_yields_zero_reward() {
     let manufacturer = Address::generate(&env);
     let recycler = Address::generate(&env);
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &0, &0);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &0,
+        &0,
+    );
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &0, &0);
 
     soroban_sdk::token::StellarAssetClient::new(&env, &token).mint(&manufacturer, &1_000_000);
@@ -54,7 +60,13 @@ fn test_exact_budget_match_deactivates_incentive() {
     let manufacturer = Address::generate(&env);
     let recycler = Address::generate(&env);
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &0, &0);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &0,
+        &0,
+    );
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &0, &0);
 
     soroban_sdk::token::StellarAssetClient::new(&env, &token).mint(&manufacturer, &1_000_000);
@@ -82,7 +94,13 @@ fn test_exact_budget_match_blocks_further_distribution() {
     let manufacturer = Address::generate(&env);
     let recycler = Address::generate(&env);
 
-    client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &symbol_short!("Mfr"), &0, &0);
+    client.register_participant(
+        &manufacturer,
+        &ParticipantRole::Manufacturer,
+        &symbol_short!("Mfr"),
+        &0,
+        &0,
+    );
     client.register_participant(&recycler, &ParticipantRole::Recycler, &symbol_short!("Rec"), &0, &0);
 
     soroban_sdk::token::StellarAssetClient::new(&env, &token).mint(&manufacturer, &1_000_000);
