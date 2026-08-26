@@ -32,6 +32,18 @@ pub mod contract_analytics;
 /// a single source of truth for all participant-related storage operations.
 pub mod participant_storage;
 
+// ── Issue #1101: Waste storage consolidation ─────────────────────────────────
+/// Centralized waste storage helpers — mirrors `participant_storage`.
+/// Owns all CRUD for `Waste` records, per-participant ID indices, and
+/// transfer-history lists.  Business logic stays in `waste.rs`.
+pub mod waste_storage;
+
+// ── Issue #1102: Incentive storage consolidation ─────────────────────────────
+/// Centralized incentive storage helpers — mirrors `participant_storage`.
+/// Owns all CRUD for `Incentive` records and per-manufacturer ID indices.
+/// Business logic (reward calc, scheduling) stays in `incentive.rs`.
+pub mod incentive_storage;
+
 // ── Issue #936: Batch operations gas optimizer ────────────────────────────────
 /// Gas optimization for batch operations through consolidated storage writes.
 /// Reduces per-item gas costs by batching participant updates and waste transfers.
