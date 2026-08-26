@@ -34,14 +34,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <ErrorBoundary>
-          <AuthProvider>
-            <WalletProvider>
+          <WalletProvider>
+            <AuthProvider>
               <ContractProvider>
                 <App />
                 <Toaster position="top-right" richColors closeButton />
               </ContractProvider>
-            </WalletProvider>
-          </AuthProvider>
+            </AuthProvider>
+          </WalletProvider>
         </ErrorBoundary>
       </ThemeProvider>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}

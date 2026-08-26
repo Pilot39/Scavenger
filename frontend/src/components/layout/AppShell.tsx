@@ -24,7 +24,7 @@ function truncate(addr: string) {
 
 export function AppShell({ children }: PropsWithChildren) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { address, isConnected, connect, disconnect, isLoading } = useWallet()
+  const { address, isConnected, connect, isLoading } = useWallet()
   const { user, logout } = useAuth()
 
   const role = user?.role ?? ''
@@ -106,7 +106,7 @@ export function AppShell({ children }: PropsWithChildren) {
                   <Wallet className="h-3.5 w-3.5 text-primary" />
                   {truncate(address)}
                 </span>
-                <Button variant="ghost" size="sm" onClick={disconnect}>
+                <Button variant="ghost" size="sm" onClick={logout}>
                   Disconnect
                 </Button>
               </div>
