@@ -1,3 +1,15 @@
+//! #1086: every POST handler in this file is a write endpoint and is already
+//! covered by `IdempotencyMiddleware`, which is mounted once with `.wrap()`
+//! on the top-level `App` in `main.rs` — actix-web applies app-level
+//! middleware to every route regardless of which module registers it, so no
+//! per-handler wiring is needed (or possible) here. Duplicate-submission
+//! protection is opt-in from the caller's side: it only activates when the
+//! request carries an `Idempotency-Key` header. Callers that must guarantee
+//! at-most-once execution for `sign_transaction`, `create_multisig`,
+//! `multisig_sign`, and `revoke_signature` — the operations here where a
+//! retried request could otherwise double-sign or double-revoke — should
+//! always send that header.
+
 use crate::validation::{error_response, sanitize_string, validate_required, ValidationError};
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
