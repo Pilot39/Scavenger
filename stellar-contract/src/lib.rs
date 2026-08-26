@@ -68,6 +68,10 @@ pub mod transfer_mgmt;
 mod test_expiration;
 mod test_grading;
 mod test_transfer_path_validation;
+#[path = "../../contracts/scavenger/src/test_pause.rs"]
+mod test_pause_coverage;
+#[path = "../../contracts/scavenger/src/test_edge_cases.rs"]
+mod test_edge_cases_coverage;
 
 pub use errors::Error;
 // Consolidated, deduplicated pub use block (fixes duplicate symbol exports)
