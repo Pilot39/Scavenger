@@ -249,20 +249,11 @@ async fn main() -> std::io::Result<()> {
                 "/api/v1/compliance/report",
                 web::post().to(compliance_api::generate_compliance_report),
             )
-            // Transaction Signing (Task 7)
-            .route("/api/v1/signing/sign", web::post().to(signing_api::sign_transaction))
+            // Transaction Signing (#1090)
+            // sign/multisig/revoke/events/revocations removed — superseded by
+            // packages/scavenger-sdk/src/signing.ts client-side signing.
+            // Only stateless verify and documentation remain server-side.
             .route("/api/v1/signing/verify", web::post().to(signing_api::verify_signature))
-            .route("/api/v1/signing/multisig", web::post().to(signing_api::create_multisig))
-            .route(
-                "/api/v1/signing/multisig/sign",
-                web::post().to(signing_api::multisig_sign),
-            )
-            .route("/api/v1/signing/revoke", web::post().to(signing_api::revoke_signature))
-            .route("/api/v1/signing/events", web::get().to(signing_api::list_events))
-            .route(
-                "/api/v1/signing/revocations",
-                web::get().to(signing_api::list_revocations),
-            )
             .route(
                 "/api/v1/signing/documentation",
                 web::get().to(signing_api::get_documentation),
