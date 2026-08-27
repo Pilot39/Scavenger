@@ -1,3 +1,8 @@
+import type { ReactNode } from 'react'
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
+import { AppShell } from '@/components/layout/AppShell'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
@@ -9,6 +14,12 @@ import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import { LandingPage } from '@/pages/LandingPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+
+// Each route gets its own boundary instance so a crash on one page doesn't
+// take down the shared AppShell/nav, and navigating away naturally resets it.
+function routeBoundary(element: ReactNode) {
+  return <ErrorBoundary>{element}</ErrorBoundary>
+}
 
 // ─── Lazy-loaded protected pages ──────────────────────────────────────────────
 // Each import() call becomes its own JS chunk — loaded only when the route is
@@ -256,14 +267,34 @@ const PROTECTED_ROUTES = [
 ]
 
 export const router = createBrowserRouter([
+  { path: '/', element: <Navigate to="/login" replace /> },
+  { path: '/login', element: routeBoundary(<LoginPage />) },
+  {
+    // Public landing page
+    path: '/',
+    element: routeBoundary(<LandingPage />),
+  },
   { path: '/', element: <LandingPage />, errorElement: <RouteErrorBoundary /> },
   { path: '/login', element: <LoginPage />, errorElement: <RouteErrorBoundary /> },
   {
     element: <ProtectedLayout />,
+    children: [
+      { path: 'dashboard', element: routeBoundary(<HomePage />) },
+      { path: 'submit', element: <div>Submit Waste</div> },
+      { path: 'collect', element: <div>Collect</div> },
+      { path: 'incentives', element: routeBoundary(<IncentivesPage />) },
+      { path: 'collect', element: routeBoundary(<CollectorDashboardPage />) },
+      { path: 'incentives', element: <div>Incentives</div> },
+      { path: 'transfer', element: <div>Transfer</div> },
+      { path: 'history', element: <div>History</div> },
+      { path: 'dashboard/recycler', element: routeBoundary(<RecyclerDashboard />) },
+      { path: 'wastes', element: routeBoundary(<WasteListPage />) },
+      { path: 'manufacturer', element: routeBoundary(<ManufacturerDashboardPage />) },
+    ],
     children: PROTECTED_ROUTES.map((route) => ({
       ...route,
       errorElement: <RouteErrorBoundary />,
     })),
   },
-  { path: '*', element: <NotFoundPage /> },
+  { path: '*', element: routeBoundary(<NotFoundPage />) },
 ])
