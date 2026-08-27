@@ -1,28 +1,14 @@
-//! Signing API — server-side verification endpoint.
-//!
-//! # SDK migration note (#1090)
-//!
-//! Transaction *signing* (key generation, multi-sig orchestration, revocation) has
-//! been migrated entirely to the client-side SDK at
-//! `packages/scavenger-sdk/src/signing.ts`.  The Freighter wallet signs
-//! transaction XDRs in the browser; the server never handles private keys.
-//!
-//! ## What remains on the server
-//!
-//! | Endpoint | Reason kept server-side |
-//! |---|---|
-//! | `POST /api/v1/signing/verify` | Audit trail — webhook consumers and back-end services need to assert a signature without access to a browser wallet |
-//! | `GET /api/v1/signing/docs` | API documentation served to SDK integrators |
-//!
-//! ## What was removed
-//!
-//! * `POST /api/v1/signing/sign` — superseded by `signWithFreighter` / `signWithSecretKey` in the SDK.
-//! * `POST /api/v1/signing/multisig/create` — superseded by client-side multi-sig orchestration.
-//! * `POST /api/v1/signing/multisig/sign` — same.
-//! * `POST /api/v1/signing/revoke` — revocation is managed by the smart contract, not the backend.
-//! * `GET /api/v1/signing/events` — event log was tied to the in-process `TransactionSigningService`
-//!   which no longer runs on the server.
-//! * `GET /api/v1/signing/revocations` — same.
+//! #1086: every POST handler in this file is a write endpoint and is already
+//! covered by `IdempotencyMiddleware`, which is mounted once with `.wrap()`
+//! on the top-level `App` in `main.rs` — actix-web applies app-level
+//! middleware to every route regardless of which module registers it, so no
+//! per-handler wiring is needed (or possible) here. Duplicate-submission
+//! protection is opt-in from the caller's side: it only activates when the
+//! request carries an `Idempotency-Key` header. Callers that must guarantee
+//! at-most-once execution for `sign_transaction`, `create_multisig`,
+//! `multisig_sign`, and `revoke_signature` — the operations here where a
+//! retried request could otherwise double-sign or double-revoke — should
+//! always send that header.
 
 use crate::validation::{error_response, sanitize_string, validate_required, ValidationError};
 use actix_web::{web, HttpResponse};

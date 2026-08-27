@@ -1,3 +1,11 @@
+//! #1086: `invalidate_waste_cache` and `invalidate_all_cache` are the only
+//! write (POST) endpoints in this file — everything else is a read-only
+//! query. Both are already covered by the app-level `IdempotencyMiddleware`
+//! wired in `main.rs` via `.wrap()`, which intercepts every write method on
+//! every route before it reaches a handler, so no additional per-endpoint
+//! wiring belongs here. See `signing_api.rs` for the equivalent note on
+//! transaction-signing endpoints.
+
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

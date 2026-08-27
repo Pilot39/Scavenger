@@ -19,6 +19,16 @@ This document provides a consolidated, OpenAPI-style reference for all API endpo
 | `X-Session-ID` | `string` | Client session identifier for audit tracing | Optional |
 | `X-Request-ID` | `UUIDv4` | Unique request tracking ID (auto-generated if omitted) | Injected in all responses |
 
+### Idempotency (`backend/src/middleware/idempotency.rs`)
+`IdempotencyMiddleware` is mounted once, app-wide, in `main.rs` — it inspects **every** `POST` / `PUT` / `PATCH` / `DELETE` request across **every** route (including `signing_api.rs` and `contracts.rs`), so SDK consumers do not need to check per-endpoint whether a given write is covered.
+
+- Send an `Idempotency-Key` header (max 128 bytes, typically a UUIDv4) on any mutating request you may need to safely retry — e.g. after a timeout or connection drop.
+- The key is scoped to the exact request; reusing it replays the **original** response rather than re-running the handler.
+- Response header `X-Idempotency-Status: created` marks the first (handler-executing) call for a key; `X-Idempotency-Status: replayed` marks a duplicate that returned the cached response.
+- Only 2xx/4xx responses are cached — a 5xx is never cached, so retrying after a server error re-runs the handler.
+- Cached entries expire after 24 hours; after that, the same key is treated as new.
+- Omitting the header is allowed (the request just isn't deduplicated) except where a specific endpoint's docs say otherwise — see the per-file notes in `signing_api.rs` for operations (signing, multisig, revocation) where a retried request without this header can double-execute a sensitive action.
+
 ### Rate Limiting Tiers
 Rate limiting is enforced at the middleware layer (`backend/src/middleware/rate_limit.rs`) with tier-based quotas and window headers:
 
