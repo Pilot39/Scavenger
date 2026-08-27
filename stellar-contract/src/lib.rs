@@ -18,6 +18,11 @@ mod storage_optimizer;
 mod query_optimizer;
 
 // ── Issue #759: extracted functional modules ──────────────────────────────────
+// Audited under issues #1097/#1100: `participant`, `waste`, and `incentive`
+// are not currently called from any function in this file — `lib.rs` keeps
+// its own inline implementation of the equivalent logic. Each module's own
+// doc comment records what was verified (error handling, storage-key
+// duplication, etc.) and why full rewiring is left as a follow-up.
 /// Participant registration, role checks, and reputation helpers.
 pub mod participant;
 /// Waste lifecycle state guards and transfer-route validation.
@@ -31,6 +36,18 @@ pub mod contract_analytics;
 /// Centralized participant storage helpers, eliminating duplicates and providing
 /// a single source of truth for all participant-related storage operations.
 pub mod participant_storage;
+
+// ── Issue #1101: Waste storage consolidation ─────────────────────────────────
+/// Centralized waste storage helpers — mirrors `participant_storage`.
+/// Owns all CRUD for `Waste` records, per-participant ID indices, and
+/// transfer-history lists.  Business logic stays in `waste.rs`.
+pub mod waste_storage;
+
+// ── Issue #1102: Incentive storage consolidation ─────────────────────────────
+/// Centralized incentive storage helpers — mirrors `participant_storage`.
+/// Owns all CRUD for `Incentive` records and per-manufacturer ID indices.
+/// Business logic (reward calc, scheduling) stays in `incentive.rs`.
+pub mod incentive_storage;
 
 // ── Issue #936: Batch operations gas optimizer ────────────────────────────────
 /// Gas optimization for batch operations through consolidated storage writes.
@@ -68,6 +85,10 @@ pub mod transfer_mgmt;
 mod test_expiration;
 mod test_grading;
 mod test_transfer_path_validation;
+#[path = "../../contracts/scavenger/src/test_pause.rs"]
+mod test_pause_coverage;
+#[path = "../../contracts/scavenger/src/test_edge_cases.rs"]
+mod test_edge_cases_coverage;
 
 pub use errors::Error;
 // Consolidated, deduplicated pub use block (fixes duplicate symbol exports)
@@ -259,6 +280,16 @@ pub struct RewardConfig {
 }
 
 /// On-chain record for a registered supply-chain participant.
+///
+/// Responsibility boundary (audited under issue #1100): this struct and the
+/// participant-related functions on `ScavengerContract` below (
+/// `register_participant`, `update_role`, `deregister_participant`,
+/// `get_participant`, storage helpers like `set_participant` /
+/// `is_participant_registered`, …) are the **live** implementation — this is
+/// what every deployed entry point actually calls. `participant.rs` is a
+/// separate, currently-unwired helper module extracted under issue #759;
+/// see its module doc for the full audit of the gap between the two and why
+/// closing it is left as a follow-up rather than attempted in this change.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Participant {

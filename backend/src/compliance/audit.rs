@@ -1,6 +1,6 @@
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplianceAuditEntry {
@@ -44,7 +44,11 @@ impl ComplianceAuditTrail {
 
     pub fn get_entries_for_compliance(&self, compliance_id: &str) -> Vec<ComplianceAuditEntry> {
         let entries = self.entries.lock().unwrap();
-        entries.iter().filter(|e| e.compliance_id == compliance_id).cloned().collect()
+        entries
+            .iter()
+            .filter(|e| e.compliance_id == compliance_id)
+            .cloned()
+            .collect()
     }
 
     pub fn count(&self) -> usize {

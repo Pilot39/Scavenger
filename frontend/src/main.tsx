@@ -103,6 +103,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <ErrorBoundary>
+          <WalletProvider>
+            <AuthProvider>
+              <ContractProvider>
+                <App />
+                <Toaster position="top-right" richColors closeButton />
+              </ContractProvider>
+            </AuthProvider>
+          </WalletProvider>
           <StoreProvider>
             <AuthProvider>
               <WalletProvider>

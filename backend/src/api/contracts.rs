@@ -1,10 +1,18 @@
+//! #1086: `invalidate_waste_cache` and `invalidate_all_cache` are the only
+//! write (POST) endpoints in this file — everything else is a read-only
+//! query. Both are already covered by the app-level `IdempotencyMiddleware`
+//! wired in `main.rs` via `.wrap()`, which intercepts every write method on
+//! every route before it reaches a handler, so no additional per-endpoint
+//! wiring belongs here. See `signing_api.rs` for the equivalent note on
+//! transaction-signing endpoints.
+
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::cache::ttl::{keys as cache_keys, CacheTtl};
 use crate::cache::{Cache, CacheInvalidationManager, InvalidationEvent};
-use crate::cache::ttl::{CacheTtl, keys as cache_keys};
 use crate::services::api::{ApiBuilder, PaginatedResponse};
 use crate::validation::{error_response, validate_pagination};
 
@@ -175,10 +183,7 @@ pub async fn list_wastes(
         .json(ApiBuilder::success_response(response))
 }
 
-pub async fn get_waste(
-    cache: web::Data<Cache>,
-    path: web::Path<String>,
-) -> HttpResponse {
+pub async fn get_waste(cache: web::Data<Cache>, path: web::Path<String>) -> HttpResponse {
     let waste_id = path.into_inner();
     let cache_key = cache_keys::waste_item(&waste_id);
 
@@ -225,9 +230,7 @@ pub async fn list_participants(
 
     let cache_key = cache_keys::participant_list(&query_string(&req));
     if let Some(cached) = cache.get(&cache_key) {
-        if let Ok(response) =
-            serde_json::from_slice::<PaginatedResponse<ParticipantResponse>>(&cached)
-        {
+        if let Ok(response) = serde_json::from_slice::<PaginatedResponse<ParticipantResponse>>(&cached) {
             return HttpResponse::Ok()
                 .insert_header(("X-Cache", "HIT"))
                 .json(ApiBuilder::success_response(response));
@@ -287,10 +290,7 @@ pub async fn list_participants(
         .json(ApiBuilder::success_response(response))
 }
 
-pub async fn get_participant(
-    cache: web::Data<Cache>,
-    path: web::Path<String>,
-) -> HttpResponse {
+pub async fn get_participant(cache: web::Data<Cache>, path: web::Path<String>) -> HttpResponse {
     let participant_id = path.into_inner();
     let cache_key = cache_keys::participant_item(&participant_id);
 
@@ -512,17 +512,13 @@ mod tests {
         let cache = Cache::new(60);
         let resp1 = get_contract_stats(web::Data::new(cache.clone())).await;
         assert_eq!(
-            resp1.headers()
-                .get("X-Cache")
-                .and_then(|v| v.to_str().ok()),
+            resp1.headers().get("X-Cache").and_then(|v| v.to_str().ok()),
             Some("MISS")
         );
 
         let resp2 = get_contract_stats(web::Data::new(cache)).await;
         assert_eq!(
-            resp2.headers()
-                .get("X-Cache")
-                .and_then(|v| v.to_str().ok()),
+            resp2.headers().get("X-Cache").and_then(|v| v.to_str().ok()),
             Some("HIT")
         );
     }
