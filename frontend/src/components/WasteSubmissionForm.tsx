@@ -30,7 +30,7 @@ interface WasteSubmissionFormProps {
 }
 
 export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormProps) {
-  const { images, addImages, removeImage, cids, isUploading, validationError: imageValidationError } = useImageUpload()
+  const { images, addImages, removeImage, uploadIds, isUploading, validationError: imageValidationError } = useImageUpload()
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('grams')
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -43,7 +43,7 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
   })
 
   const onFormSubmit = handleSubmit(async (data) => {
-    if (cids.length === 0) return
+    if (uploadIds.length === 0) return
     const weightInGrams = toWeightInGrams(data.weight, weightUnit)
     setSubmitState('loading')
     setSubmitError(null)
@@ -55,7 +55,7 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
         latitude: data.latitude,
         longitude: data.longitude,
         notes: data.notes,
-        photoCids: cids,
+        photoCids: uploadIds,
       })
       setSubmitState('success')
     } catch (e) {
@@ -65,7 +65,7 @@ export function WasteSubmissionForm({ onSubmit, onCancel }: WasteSubmissionFormP
   })
 
   const photoError = submitState !== 'idle' || Object.keys(errors).length > 0
-    ? cids.length === 0 && images.length === 0 ? 'At least one photo is required' : null
+    ? uploadIds.length === 0 && images.length === 0 ? 'At least one photo is required' : null
     : null
 
   if (submitState === 'success') {
