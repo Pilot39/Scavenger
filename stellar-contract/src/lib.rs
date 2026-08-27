@@ -18,6 +18,11 @@ mod storage_optimizer;
 mod query_optimizer;
 
 // ── Issue #759: extracted functional modules ──────────────────────────────────
+// Audited under issues #1097/#1100: `participant`, `waste`, and `incentive`
+// are not currently called from any function in this file — `lib.rs` keeps
+// its own inline implementation of the equivalent logic. Each module's own
+// doc comment records what was verified (error handling, storage-key
+// duplication, etc.) and why full rewiring is left as a follow-up.
 /// Participant registration, role checks, and reputation helpers.
 pub mod participant;
 /// Waste lifecycle state guards and transfer-route validation.
@@ -259,6 +264,16 @@ pub struct RewardConfig {
 }
 
 /// On-chain record for a registered supply-chain participant.
+///
+/// Responsibility boundary (audited under issue #1100): this struct and the
+/// participant-related functions on `ScavengerContract` below (
+/// `register_participant`, `update_role`, `deregister_participant`,
+/// `get_participant`, storage helpers like `set_participant` /
+/// `is_participant_registered`, …) are the **live** implementation — this is
+/// what every deployed entry point actually calls. `participant.rs` is a
+/// separate, currently-unwired helper module extracted under issue #759;
+/// see its module doc for the full audit of the gap between the two and why
+/// closing it is left as a follow-up rather than attempted in this change.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Participant {
