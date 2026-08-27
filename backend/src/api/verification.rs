@@ -1,3 +1,4 @@
+use crate::services::verification::{MAX_DOC_TYPE_LEN};
 use crate::services::VerificationService;
 use crate::validation::{error_response, sanitize_string, validate_required, ValidationError};
 use actix_web::{web, HttpResponse};
@@ -80,6 +81,8 @@ fn validate_url(url: &str, field: &str) -> Option<ValidationError> {
 }
 
 /// Validates a non-empty, reasonably-sized doc_type identifier.
+/// The maximum length limit is imported from the domain layer (`MAX_DOC_TYPE_LEN`)
+/// so the rule is never duplicated.
 fn validate_doc_type(doc_type: &str) -> Option<ValidationError> {
     let trimmed = doc_type.trim();
     if trimmed.is_empty() {
@@ -88,10 +91,10 @@ fn validate_doc_type(doc_type: &str) -> Option<ValidationError> {
             message: "doc_type is required".to_string(),
         });
     }
-    if trimmed.len() > 64 {
+    if trimmed.len() > MAX_DOC_TYPE_LEN {
         return Some(ValidationError {
             field: "doc_type".to_string(),
-            message: "doc_type must be at most 64 characters".to_string(),
+            message: format!("doc_type must be at most {} characters", MAX_DOC_TYPE_LEN),
         });
     }
     None
