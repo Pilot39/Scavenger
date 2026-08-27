@@ -3,6 +3,7 @@ pub mod conversion;
 pub mod format;
 pub mod serialization;
 pub mod types;
+pub mod ws_errors;
 
 #[cfg(test)]
 mod tests;
@@ -16,3 +17,4 @@ pub use types::{
     AnalyticsError, AppError, AuthError, ContractError, EmailError, ErrorCategory, ExportError, FieldError,
     NotificationError, SerializationError, StorageError, ValidationError, WebhookError,
 };
+pub use ws_errors::{WsErrorCode, WsErrorFrame};

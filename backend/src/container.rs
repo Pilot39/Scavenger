@@ -1,11 +1,33 @@
-//! Dependency injection container (#914).
+//! Dependency injection container (#914, #1091).
 //!
-//! `AppContainer` is the single place where every service is constructed and
-//! held behind an `Arc`.  Handlers receive individual `Arc<dyn Trait>` slices
-//! of the container via actix-web's `web::Data` — none of them construct their
-//! own dependencies.
+//! `AppContainer` is the single composition root. Every service dependency is
+//! expressed as an explicit constructor parameter — there are no implicit global
+//! singletons or hidden initialization-order dependencies.
+//!
+//! # Design rules
+//!
+//! 1. **All dependencies are constructor parameters.** `AppContainer::new` lists
+//!    every service as an argument. The compiler enforces that nothing is
+//!    accidentally omitted.
+//!
+//! 2. **`from_env` is the only place that reads environment variables.** It calls
+//!    `new(...)` after building each dependency. Adding a new env-var dependency
+//!    means adding it here and nowhere else.
+//!
+//! 3. **Handlers never construct their own dependencies.** They receive individual
+//!    `Arc<dyn Trait>` slices via actix-web's `web::Data`.
+//!
+//! # How to add a new service
+//!
+//! 1. Define your service type (struct + trait if it needs to be mockable).
+//! 2. Add an `Arc<dyn YourTrait>` (or `Arc<ConcreteType>`) field to `AppContainer`.
+//! 3. Add a matching parameter to `AppContainer::new`.
+//! 4. Construct the real implementation in `AppContainer::from_env` and pass it.
+//! 5. Add a `FakeYourService` in the `fakes` module below and use it in
+//!    `AppContainer::with_test_config` so existing DI tests keep compiling.
 //!
 //! # Usage (in `main.rs`)
+//!
 //! ```ignore
 //! let container = AppContainer::from_env()
 //!     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
@@ -33,6 +55,9 @@ use crate::{
 };
 
 /// Central DI container — built once at startup, then shared via `Arc`.
+///
+/// All fields are `pub` so that `main.rs` can extract individual `Arc`s for
+/// actix-web `web::Data` registration without cloning the whole container.
 pub struct AppContainer {
     pub email: Arc<dyn EmailService>,
     pub notification: Arc<dyn NotificationService>,
@@ -49,7 +74,52 @@ pub struct AppContainer {
 }
 
 impl AppContainer {
-    /// Construct the container from environment variables.
+    /// Construct the container with **explicit** dependencies.
+    ///
+    /// This is the canonical constructor.  Every dependency is a named
+    /// parameter — there is no implicit ordering; the compiler will reject
+    /// any attempt to call this with a missing argument.
+    ///
+    /// In production code, call [`AppContainer::from_env`] which reads
+    /// environment variables and delegates here.
+    /// In tests, call [`AppContainer::with_test_config`] or build fakes
+    /// manually and call this constructor directly.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        email: Arc<dyn EmailService>,
+        notification: Arc<dyn NotificationService>,
+        reporting: Arc<dyn ReportService>,
+        storage: Arc<dyn StorageService>,
+        webhook: Arc<WebhookManager>,
+        cache: Cache,
+        cache_invalidation: Arc<CacheInvalidationManager>,
+        audit: Arc<AuditService>,
+        verification: Arc<dyn VerificationService>,
+        search: Arc<SearchClient>,
+        archival: Arc<ArchivalService>,
+        stellar: Arc<StellarRpcClient>,
+    ) -> Self {
+        Self {
+            email,
+            notification,
+            reporting,
+            storage,
+            webhook,
+            cache,
+            cache_invalidation,
+            audit,
+            verification,
+            search,
+            archival,
+            stellar,
+        }
+    }
+
+    /// Construct the container by reading all configuration from environment variables.
+    ///
+    /// This is the production entry-point.  It builds each concrete service and
+    /// calls [`AppContainer::new`].  Every `unwrap_or*` has a documented fallback
+    /// value that is safe for local development.
     pub fn from_env() -> Result<Self, String> {
         let email_service: Arc<dyn EmailService> = Arc::new(SendGridEmailService::new(
             std::env::var("SENDGRID_API_KEY").unwrap_or_default(),
@@ -75,12 +145,12 @@ impl AppContainer {
         let audit_service = Arc::new(AuditService::new());
         let verification_service: Arc<dyn VerificationService> = Arc::new(DefaultVerificationService::new());
 
-        // Stellar RPC
+        // Stellar RPC — uses STELLAR_RPC_URL / CONTRACT_ID env vars.
         let stellar_rpc_config = StellarRpcConfig::from_env();
         let stellar_client =
             Arc::new(StellarRpcClient::new(stellar_rpc_config).map_err(|e| format!("Stellar RPC init failed: {e}"))?);
 
-        // Search client
+        // Elasticsearch search client.
         let search_config = SearchClientConfig {
             url: std::env::var("ELASTICSEARCH_URL").unwrap_or_else(|_| "http://localhost:9200".to_string()),
             username: std::env::var("ELASTICSEARCH_USERNAME").ok(),
@@ -91,7 +161,7 @@ impl AppContainer {
         let search_client =
             Arc::new(SearchClient::new(search_config).map_err(|e| format!("Search client init failed: {e}"))?);
 
-        // Archival service
+        // Archival service — file-system backed by default.
         let archival_storage_path =
             std::env::var("ARCHIVAL_STORAGE_PATH").unwrap_or_else(|_| "/tmp/archives".to_string());
         let archival_storage = Arc::new(FileSystemArchivalStorage::new(std::path::PathBuf::from(
@@ -99,20 +169,20 @@ impl AppContainer {
         )));
         let archival_service = Arc::new(ArchivalService::new(archival_storage));
 
-        Ok(Self {
-            email: email_service,
-            notification: notification_service,
-            reporting: reporting_service,
-            storage: storage_service,
-            webhook: webhook_manager,
+        Ok(Self::new(
+            email_service,
+            notification_service,
+            reporting_service,
+            storage_service,
+            webhook_manager,
             cache,
             cache_invalidation,
-            audit: audit_service,
-            verification: verification_service,
-            search: search_client,
-            archival: archival_service,
-            stellar: stellar_client,
-        })
+            audit_service,
+            verification_service,
+            search_client,
+            archival_service,
+            stellar_client,
+        ))
     }
 }
 
@@ -120,8 +190,11 @@ impl AppContainer {
 
 #[cfg(test)]
 pub mod fakes {
-    //! In-memory fakes for every service trait.  Import these in unit tests
-    //! instead of spinning up real connections.
+    //! In-memory fakes for every service trait.
+    //!
+    //! Import these in unit tests instead of spinning up real connections.
+    //! All fakes implement the same traits as the real services, so they can
+    //! be passed to `AppContainer::new` directly.
 
     use std::collections::HashMap;
     use std::sync::Mutex;
@@ -423,5 +496,94 @@ pub mod fakes {
         async fn send_rejection_notification(&self, _participant_id: String, _reason: String) -> Result<(), String> {
             Ok(())
         }
+    }
+}
+
+// ── Container construction tests ──────────────────────────────────────────────
+
+#[cfg(test)]
+mod container_tests {
+    //! Verifies that `AppContainer::new` can be wired up with fake services
+    //! and that the trait objects satisfy the required bounds.
+
+    use std::sync::Arc;
+
+    use super::fakes::*;
+    use crate::{
+        cache::{Cache, CacheInvalidationManager},
+        rpc::{StellarRpcClient, StellarRpcConfig},
+        search::{SearchClient, SearchClientConfig},
+        services::{
+            AuditService, ArchivalService, FileSystemArchivalStorage,
+            EmailService, NotificationService, ReportService, StorageService, VerificationService,
+            WebhookManager,
+        },
+    };
+
+    /// Build a minimal test-only `AppContainer` using in-memory fakes for all
+    /// trait-object services and stub configurations for infrastructure clients.
+    ///
+    /// This test verifies:
+    /// * All service traits are `dyn`-compatible.
+    /// * `AppContainer::new` accepts them without implicit ordering.
+    /// * No panics occur during construction with test config values.
+    #[test]
+    fn container_builds_with_test_fakes() {
+        let email: Arc<dyn EmailService> = Arc::new(FakeEmailService::new());
+        let notification: Arc<dyn NotificationService> = Arc::new(FakeNotificationService::new());
+        let reporting: Arc<dyn ReportService> = Arc::new(FakeReportService::new());
+        let storage: Arc<dyn StorageService> = Arc::new(FakeStorageService::new());
+        let webhook = Arc::new(WebhookManager::new());
+        let cache = Cache::new(60);
+        let cache_invalidation = Arc::new(CacheInvalidationManager::new());
+        let audit = Arc::new(AuditService::new());
+        let verification: Arc<dyn VerificationService> = Arc::new(FakeVerificationService::new());
+
+        // Search client with a test URL (no real connection made at construction).
+        let search_config = SearchClientConfig {
+            url: "http://localhost:9200".to_string(),
+            username: None,
+            password: None,
+            timeout_seconds: 5,
+            validate_certificates: false,
+        };
+        let search = Arc::new(
+            SearchClient::new(search_config).expect("search client construction should not fail"),
+        );
+
+        // Archival service backed by /tmp.
+        let archival_storage = Arc::new(FileSystemArchivalStorage::new(
+            std::path::PathBuf::from("/tmp/test-archives"),
+        ));
+        let archival = Arc::new(ArchivalService::new(archival_storage));
+
+        // Stellar RPC with stub config (no real connection made at construction).
+        let stellar_config = StellarRpcConfig::from_env();
+        let stellar = Arc::new(
+            StellarRpcClient::new(stellar_config).expect("stellar client construction should not fail"),
+        );
+
+        // Exercise the explicit constructor — this is the assertion: it compiles
+        // and runs without panicking.
+        let container = super::AppContainer::new(
+            email,
+            notification,
+            reporting,
+            storage,
+            webhook,
+            cache,
+            cache_invalidation,
+            audit,
+            verification,
+            search,
+            archival,
+            stellar,
+        );
+
+        // Spot-check that the container fields are accessible.
+        // (No network calls are made; these are all in-memory fakes or stubs.)
+        let _ = container.audit.clone();
+        let _ = container.cache.clone();
+        let _ = container.webhook.clone();
     }
 }
