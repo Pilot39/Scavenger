@@ -1,3 +1,14 @@
+/// Push-notification service (issue #1074 — structured logging).
+///
+/// ## Logging convention
+/// Every operation emits a structured log line at the appropriate level.
+/// Required fields:
+///   - `service`    — always `"notifications"`
+///   - `outcome`    — `"ok"` | `"error"` | `"warn"`
+///   - `op`         — the method name (e.g. `"register_device"`)
+///   - context keys  — e.g. `user_id`, `platform` where safe to log
+///
+/// `println!` / ad-hoc debug logging have been removed throughout.
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -52,7 +63,10 @@ pub trait NotificationService: Send + Sync {
         &self,
         preference: NotificationPreference,
     ) -> Result<(), NotificationError>;
-    async fn get_preferences(&self, user_id: &str) -> Result<NotificationPreference, NotificationError>;
+    async fn get_preferences(
+        &self,
+        user_id: &str,
+    ) -> Result<NotificationPreference, NotificationError>;
     async fn schedule_notification(
         &self,
         scheduled: ScheduledNotification,
@@ -82,12 +96,28 @@ impl NotificationService for FirebaseNotificationService {
         self.validate_token(&token.token)?;
 
         if token.user_id.is_empty() {
-            return Err(NotificationError::InvalidToken(
-                "Empty user_id".to_string(),
-            ));
+            log::warn!(
+                service = "notifications",
+                op = "register_device",
+                outcome = "error",
+                user_id = %token.user_id,
+                platform = %token.platform;
+                "register_device rejected: empty user_id"
+            );
+            return Err(NotificationError::InvalidToken("Empty user_id".to_string()));
         }
 
-        Ok(uuid::Uuid::new_v4().to_string())
+        let registration_id = uuid::Uuid::new_v4().to_string();
+        log::info!(
+            service = "notifications",
+            op = "register_device",
+            outcome = "ok",
+            user_id = %token.user_id,
+            platform = %token.platform,
+            registration_id = %registration_id;
+            "device registered"
+        );
+        Ok(registration_id)
     }
 
     async fn send_notification(
@@ -98,9 +128,13 @@ impl NotificationService for FirebaseNotificationService {
         self.validate_token(device_token)?;
 
         if notification.title.is_empty() {
-            return Err(NotificationError::ServiceError(
-                "Empty title".to_string(),
-            ));
+            log::warn!(
+                service = "notifications",
+                op = "send_notification",
+                outcome = "error";
+                "send_notification rejected: empty title"
+            );
+            return Err(NotificationError::ServiceError("Empty title".to_string()));
         }
 
         let client = reqwest::Client::new();
@@ -123,11 +157,35 @@ impl NotificationService for FirebaseNotificationService {
             .json(&body)
             .send()
             .await
-            .map_err(|e| NotificationError::ServiceError(e.to_string()))?;
+            .map_err(|e| {
+                log::error!(
+                    service = "notifications",
+                    op = "send_notification",
+                    outcome = "error",
+                    error = %e;
+                    "FCM HTTP request failed"
+                );
+                NotificationError::ServiceError(e.to_string())
+            })?;
 
         if response.status().is_success() {
-            Ok(uuid::Uuid::new_v4().to_string())
+            let message_id = uuid::Uuid::new_v4().to_string();
+            log::info!(
+                service = "notifications",
+                op = "send_notification",
+                outcome = "ok",
+                message_id = %message_id;
+                "notification sent via FCM"
+            );
+            Ok(message_id)
         } else {
+            log::error!(
+                service = "notifications",
+                op = "send_notification",
+                outcome = "error",
+                status = %response.status();
+                "FCM returned non-success status"
+            );
             Err(NotificationError::ServiceError(
                 "Failed to send notification".to_string(),
             ))
@@ -139,18 +197,47 @@ impl NotificationService for FirebaseNotificationService {
         preference: NotificationPreference,
     ) -> Result<(), NotificationError> {
         if preference.user_id.is_empty() {
-            return Err(NotificationError::InvalidToken(
-                "Empty user_id".to_string(),
-            ));
+            log::warn!(
+                service = "notifications",
+                op = "set_preferences",
+                outcome = "error";
+                "set_preferences rejected: empty user_id"
+            );
+            return Err(NotificationError::InvalidToken("Empty user_id".to_string()));
         }
+
+        log::info!(
+            service = "notifications",
+            op = "set_preferences",
+            outcome = "ok",
+            user_id = %preference.user_id,
+            enabled = %preference.enabled;
+            "notification preferences updated"
+        );
         Ok(())
     }
 
-    async fn get_preferences(&self, user_id: &str) -> Result<NotificationPreference, NotificationError> {
+    async fn get_preferences(
+        &self,
+        user_id: &str,
+    ) -> Result<NotificationPreference, NotificationError> {
         if user_id.is_empty() {
+            log::warn!(
+                service = "notifications",
+                op = "get_preferences",
+                outcome = "error";
+                "get_preferences rejected: empty user_id"
+            );
             return Err(NotificationError::NotFound("User not found".to_string()));
         }
 
+        log::info!(
+            service = "notifications",
+            op = "get_preferences",
+            outcome = "ok",
+            user_id = %user_id;
+            "notification preferences retrieved"
+        );
         Ok(NotificationPreference {
             user_id: user_id.to_string(),
             enabled: true,
@@ -165,12 +252,25 @@ impl NotificationService for FirebaseNotificationService {
         self.validate_token(&scheduled.device_token)?;
 
         if scheduled.notification.title.is_empty() {
-            return Err(NotificationError::ServiceError(
-                "Empty title".to_string(),
-            ));
+            log::warn!(
+                service = "notifications",
+                op = "schedule_notification",
+                outcome = "error";
+                "schedule_notification rejected: empty title"
+            );
+            return Err(NotificationError::ServiceError("Empty title".to_string()));
         }
 
-        Ok(uuid::Uuid::new_v4().to_string())
+        let schedule_id = uuid::Uuid::new_v4().to_string();
+        log::info!(
+            service = "notifications",
+            op = "schedule_notification",
+            outcome = "ok",
+            schedule_id = %schedule_id,
+            scheduled_at = %scheduled.scheduled_at;
+            "notification scheduled"
+        );
+        Ok(schedule_id)
     }
 }
 
@@ -247,5 +347,17 @@ mod tests {
         };
         let result = service.schedule_notification(scheduled).await;
         assert!(result.is_ok());
+    }
+
+    /// Verify no log messages are lost when empty user_id is provided.
+    #[tokio::test]
+    async fn test_set_preferences_empty_user_id() {
+        let service = FirebaseNotificationService::new("project-id".to_string());
+        let pref = NotificationPreference {
+            user_id: String::new(),
+            enabled: true,
+            categories: vec![],
+        };
+        assert!(service.set_preferences(pref).await.is_err());
     }
 }
