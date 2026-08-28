@@ -1,6 +1,8 @@
+mod api;
 mod services;
 
 use actix_web::{web, App, HttpServer, HttpResponse};
+use api::configure_api_routes;
 use services::{
     EmailService, SendGridEmailService, NotificationService, FirebaseNotificationService,
     ReportService, ReportingService, StorageService, S3StorageService,
@@ -29,7 +31,7 @@ async fn main() -> std::io::Result<()> {
         std::env::var("AWS_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
     ));
 
-    println!("Starting Scavenger Backend Server on 0.0.0.0:8080");
+    log::info!("Starting Scavenger Backend Server on 0.0.0.0:8080");
 
     HttpServer::new(move || {
         App::new()
@@ -37,6 +39,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(notification_service.clone()))
             .app_data(web::Data::new(reporting_service.clone()))
             .app_data(web::Data::new(storage_service.clone()))
+            .configure(configure_api_routes)
             .route("/health", web::get().to(health_check))
     })
     .bind("0.0.0.0:8080")?
