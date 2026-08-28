@@ -1,4 +1,5 @@
 mod api;
+mod errors;
 mod services;
 
 use actix_web::{web, App, HttpServer, HttpResponse};
