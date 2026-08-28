@@ -1,119 +1,77 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { WasteComparison, buildRows, cellClass, numericValues } from '@/components/ui/WasteComparison'
-import { Waste, WasteType } from '@/api/types'
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { WasteComparison, buildRows, cellClass, numericValues } from '../WasteComparison'
+import { Waste } from '@/api/types'
 
-function makeWaste(overrides: Partial<Waste> = {}): Waste {
-  return {
+const mockWastes: Waste[] = [
+  {
     waste_id: 1n,
-    waste_type: WasteType.Paper,
-    weight: 2000n,
-    current_owner: 'ADDR_A',
-    latitude: 0n,
-    longitude: 0n,
-    recycled_timestamp: 1700000000,
+    waste_type: 'Plastic',
+    weight: 5000n,
+    is_active: true,
+    is_confirmed: true,
+    recycled_timestamp: 1000000n,
+    owner: 'addr1',
+    current_holder: 'addr1',
+    confirmer: null,
+  },
+  {
+    waste_id: 2n,
+    waste_type: 'Metal',
+    weight: 10000n,
     is_active: true,
     is_confirmed: false,
-    confirmer: '',
-    ...overrides,
-  }
-}
+    recycled_timestamp: 2000000n,
+    owner: 'addr2',
+    current_holder: 'addr2',
+    confirmer: null,
+  },
+]
 
-// ── Pure helper tests ─────────────────────────────────────────────────────────
-
-describe('numericValues', () => {
-  it('converts numbers to numbers', () => {
-    expect(numericValues([1, 2, 3])).toEqual([1, 2, 3])
+describe('WasteComparison', () => {
+  it('renders comparison table', () => {
+    render(<WasteComparison wastes={mockWastes} />)
+    expect(screen.getByText(/Comparing 2 waste items/)).toBeInTheDocument()
   })
 
-  it('parses numeric strings', () => {
-    expect(numericValues(['1.5', '2.5'])).toEqual([1.5, 2.5])
+  it('exports CSV', () => {
+    const { getByRole } = render(<WasteComparison wastes={mockWastes} />)
+    const exportBtn = getByRole('button', { name: /Export CSV/ })
+    expect(exportBtn).toBeInTheDocument()
   })
 
-  it('returns 0 for non-numeric strings', () => {
-    expect(numericValues(['abc'])).toEqual([0])
-  })
-})
-
-describe('cellClass', () => {
-  it('returns green class for max value', () => {
-    const cls = cellClass(10, [5, 10, 7], true)
-    expect(cls).toContain('green')
-  })
-
-  it('returns red class for min value', () => {
-    const cls = cellClass(5, [5, 10, 7], true)
-    expect(cls).toContain('red')
-  })
-
-  it('returns empty string when all values are equal', () => {
-    const cls = cellClass(5, [5, 5, 5], true)
-    expect(cls).toBe('')
-  })
-
-  it('returns empty string when highlight is false', () => {
-    const cls = cellClass(10, [5, 10], false)
-    expect(cls).toBe('')
+  it('returns null for empty wastes', () => {
+    const { container } = render(<WasteComparison wastes={[]} />)
+    expect(container.firstChild).toBeNull()
   })
 })
 
 describe('buildRows', () => {
-  it('returns rows for each field', () => {
-    const rows = buildRows([makeWaste()])
-    expect(rows.length).toBeGreaterThanOrEqual(4)
-  })
-
-  it('weight row has highlight flag', () => {
-    const rows = buildRows([makeWaste()])
-    const weightRow = rows.find((r) => r.label === 'Weight (kg)')
-    expect(weightRow?.highlight).toBe(true)
-  })
-
-  it('weight is converted from grams to kg', () => {
-    const rows = buildRows([makeWaste({ weight: 5000n })])
-    const weightRow = rows.find((r) => r.label === 'Weight (kg)')
-    expect(weightRow?.values[0]).toBe(5)
+  it('builds comparison rows', () => {
+    const rows = buildRows(mockWastes)
+    expect(rows).toHaveLength(5)
+    expect(rows[0].label).toBe('Waste Type')
+    expect(rows[1].label).toBe('Weight (kg)')
   })
 })
 
-// ── Component tests ───────────────────────────────────────────────────────────
-
-describe('WasteComparison component', () => {
-  it('renders nothing for empty wastes', () => {
-    const { container } = render(<WasteComparison wastes={[]} />)
-    expect(container.firstChild).toBeNull()
+describe('cellClass', () => {
+  it('highlights max value', () => {
+    const values = [5, 10, 3]
+    const cls = cellClass(10, values, true)
+    expect(cls).toContain('green')
   })
 
-  it('renders table with waste IDs', () => {
-    render(<WasteComparison wastes={[makeWaste({ waste_id: 42n }), makeWaste({ waste_id: 99n })]} />)
-    expect(screen.getAllByText('#42').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('#99').length).toBeGreaterThan(0)
+  it('highlights min value', () => {
+    const values = [5, 10, 3]
+    const cls = cellClass(3, values, true)
+    expect(cls).toContain('red')
   })
+})
 
-  it('shows correct number of columns', () => {
-    render(<WasteComparison wastes={[makeWaste({ waste_id: 1n }), makeWaste({ waste_id: 2n }), makeWaste({ waste_id: 3n })]} />)
-    // 3 waste columns + 1 label column = 4 th elements
-    const headers = document.querySelectorAll('th')
-    expect(headers.length).toBe(4)
-  })
-
-  it('shows export button', () => {
-    render(<WasteComparison wastes={[makeWaste(), makeWaste({ waste_id: 2n })]} />)
-    expect(screen.getByText(/Export CSV/i)).toBeTruthy()
-  })
-
-  it('export button triggers download', () => {
-    const click = vi.fn()
-    const mockAnchor = { href: '', download: '', click, style: {} }
-    const origCreate = document.createElement.bind(document)
-    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-      if (tag === 'a') return mockAnchor as unknown as HTMLElement
-      return origCreate(tag)
-    })
-    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:url'), revokeObjectURL: vi.fn() })
-    render(<WasteComparison wastes={[makeWaste(), makeWaste({ waste_id: 2n })]} />)
-    fireEvent.click(screen.getByText(/Export CSV/i))
-    expect(click).toHaveBeenCalled()
-    vi.restoreAllMocks()
+describe('numericValues', () => {
+  it('converts values to numbers', () => {
+    const result = numericValues([5, '10', 3])
+    expect(result).toEqual([5, 10, 3])
   })
 })

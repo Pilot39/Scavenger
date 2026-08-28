@@ -15,6 +15,16 @@ soroban-sdk = { workspace = true }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "contract_benchmarks"
+harness = false
 
 [features]
 testutils = ["soroban-sdk/testutils"]
+# `debug` gates explorer.rs and contract_analytics.rs, which are
+# introspection-only helpers with no production contract logic.
+# Exclude from release WASM builds to reduce binary size.
+# Enable with: cargo build --features debug
+debug = []
