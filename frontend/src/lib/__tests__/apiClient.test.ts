@@ -172,14 +172,15 @@ describe('ApiClient', () => {
     })
 
     it('throws ApiError with status 0 on network failure', async () => {
-      server.use(http.get('*/api/wastes', () => HttpResponse.error()))
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Failed to fetch.')))
+      const client = createApiClient({ baseUrl: 'https://api.example.com' })
 
       const client = createApiClient({ baseUrl: 'https://api.example.com' })
       await expect(client.get('/api/wastes')).rejects.toThrow(ApiError)
     })
 
     it('throws ApiError with timeout message when AbortError is raised', async () => {
-      const abortError = new Error('Aborted')
+      const abortError = new Error('Aborted.')
       abortError.name = 'AbortError'
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(abortError))
 

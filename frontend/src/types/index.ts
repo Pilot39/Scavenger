@@ -17,11 +17,11 @@ export interface NotificationItem {
   read: boolean
 }
 
-export interface TableColumn<T = any> {
+export interface TableColumn<T = Record<string, unknown>> {
   key: keyof T
   label: string
   sortable?: boolean
-  render?: (value: any, item: T) => React.ReactNode
+  render?: (value: unknown, item: T) => React.ReactNode
 }
 
 export interface ModalProps {
