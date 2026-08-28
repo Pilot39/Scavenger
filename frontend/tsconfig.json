@@ -3,39 +3,28 @@
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "jsx": "react-jsx",
-    "types": ["vite/client", "node"],
+    "types": ["node", "@testing-library/jest-dom", "vitest/globals", "vite/client"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@/components/*": ["src/components/*"],
-      "@/pages/*": ["src/pages/*"],
-      "@/hooks/*": ["src/hooks/*"],
-      "@/lib/*": ["src/lib/*"],
-      "@/context/*": ["src/context/*"],
-      "@/types/*": ["src/types/*"],
+      "@components/*": ["src/components/*"],
+      "@pages/*": ["src/pages/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@lib/*": ["src/lib/*"],
       "@/config/*": ["src/config/*"],
       "@/stories/*": ["src/stories/*"],
       "@/api/*": ["src/api/*"],
       "@/assets/*": ["src/assets/*"],
       "@/i18n/*": ["src/i18n/*"],
       "@/test/*": ["src/test/*"]
-    }
+    },
     "outDir": "./dist",
     "rootDir": "./src",
-    "types": ["node", "@testing-library/jest-dom", "vitest/globals"],
     "module": "ESNext",
     "target": "ES2020",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"],
-      "@pages/*": ["src/pages/*"],
-      "@components/*": ["src/components/*"],
-      "@hooks/*": ["src/hooks/*"],
-      "@lib/*": ["src/lib/*"]
-    }
+    "noEmit": true
   },
   "include": ["src/**/*", "vitest.shims.d.ts"],
   "exclude": ["node_modules", "dist", ".next", "e2e"]

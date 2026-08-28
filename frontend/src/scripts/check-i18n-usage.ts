@@ -42,7 +42,7 @@ function getLocaleKeys(localeDir: string): Record<string, Set<string>> {
 }
 
 // Flatten nested object keys with dot notation
-function flattenKeys(obj: any, prefix = ''): string[] {
+function flattenKeys(obj: Record<string, unknown>, prefix = ''): string[] {
   const keys: string[] = []
   for (const [k, v] of Object.entries(obj)) {
     const key = prefix ? `${prefix}.${k}` : k

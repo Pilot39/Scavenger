@@ -16,6 +16,7 @@ mod audit_log;
 mod storage_utils;
 mod storage_optimizer;
 mod query_optimizer;
+mod versioning;
 
 // ── Issue #759: extracted functional modules ──────────────────────────────────
 // Audited under issues #1097/#1100: `participant`, `waste`, and `incentive`

@@ -21,7 +21,7 @@ export interface IndexerState {
 }
 
 export interface DatabaseConnection {
-  query<T = any>(text: string, params?: any[]): Promise<{ rows: T[] }>
+  query<T = unknown>(text: string, params?: unknown[]): Promise<{ rows: T[] }>
   transaction<T>(callback: (client: DatabaseConnection) => Promise<T>): Promise<T>
 }
 

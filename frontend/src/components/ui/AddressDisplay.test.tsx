@@ -191,7 +191,7 @@ describe('AddressDisplay', () => {
 
     it('handles clipboard write errors gracefully', async () => {
       const user = userEvent.setup()
-      mockClipboardWrite.mockRejectedValue(new Error('Clipboard denied'))
+      mockClipboardWrite.mockRejectedValue(new Error('Clipboard denied.'))
       const address = 'GBRPYHIL2CI3WHZDTOOQFC6EB4KJJGUJSY4T4EISLE5MXE3EBBD63XY'
 
       render(<AddressDisplay address={address} />)
