@@ -555,6 +555,44 @@ impl ScavengerContract {
         }
     }
 
+    /// Resource-cost optimization (see BENCHMARK_RESULTS.md "Storage read
+    /// caching"): same checks as `require_registered`, but returns the
+    /// fetched `Participant` so callers that also need the record (e.g. for
+    /// a role check) can reuse this single storage read instead of issuing
+    /// a second one.
+    fn require_registered_participant(env: &Env, address: &Address) -> Participant {
+        let key = (address.clone(),);
+        let participant: Option<Participant> = env.storage().instance().get(&key);
+
+        match participant {
+            Some(p) if p.is_registered => p,
+            Some(_) => panic!("Participant is not registered"),
+            None => panic!("Participant not found"),
+        }
+    }
+
+    /// Shared role-transition rule used by both `is_valid_transfer` (which
+    /// fetches its own participants) and `transfer_waste` (which reuses
+    /// participants it already fetched via `require_registered_participant`,
+    /// avoiding a redundant storage read for the same records).
+    fn role_transition_allowed(from_p: &Participant, to_p: &Participant) -> bool {
+        if !from_p.is_registered || !to_p.is_registered {
+            return false;
+        }
+
+        // Invalid if transferring to the same role
+        if from_p.role == to_p.role {
+            return false;
+        }
+
+        matches!(
+            (from_p.role, to_p.role),
+            (ParticipantRole::Recycler, ParticipantRole::Collector)
+                | (ParticipantRole::Recycler, ParticipantRole::Manufacturer)
+                | (ParticipantRole::Collector, ParticipantRole::Manufacturer)
+        )
+    }
+
     /// Verify that the caller is the contract administrator
     /// Panics with "Caller is not the contract admin" if not admin
     /// Panics with "Contract admin has not been set" if admin not configured
@@ -1285,21 +1323,7 @@ impl ScavengerContract {
             return false;
         };
 
-        if !from_p.is_registered || !to_p.is_registered {
-            return false;
-        }
-
-        // Invalid if transferring to the same role
-        if from_p.role == to_p.role {
-            return false;
-        }
-
-        matches!(
-            (from_p.role, to_p.role),
-            (ParticipantRole::Recycler, ParticipantRole::Collector)
-                | (ParticipantRole::Recycler, ParticipantRole::Manufacturer)
-                | (ParticipantRole::Collector, ParticipantRole::Manufacturer)
-        )
+        Self::role_transition_allowed(&from_p, &to_p)
     }
 
     /// Standalone public function to validate a transfer path for a specific waste item.
@@ -2344,8 +2368,15 @@ impl ScavengerContract {
         from.require_auth();
 
         Self::require_not_paused(&env);
-        Self::require_registered(&env, &from);
-        Self::require_registered(&env, &to);
+
+        // Resource-cost optimization (BENCHMARK_RESULTS.md "Storage read
+        // caching"): fetch each participant record once and reuse it for
+        // both the registration check and the role-transition check below,
+        // instead of the previous 4 separate storage reads (2 via
+        // `require_registered` + 2 more inside `is_valid_transfer`) for the
+        // same two records.
+        let from_participant = Self::require_registered_participant(&env, &from);
+        let to_participant = Self::require_registered_participant(&env, &to);
 
         let mut material: Material =
             Self::get_waste_internal(&env, waste_id).expect("Waste not found");
@@ -2365,8 +2396,9 @@ impl ScavengerContract {
         //     panic!("Cannot transfer deactivated waste");
         // }
 
-        // Align with v2: enforce valid transfer routes
-        if !Self::is_valid_transfer(&env, from.clone(), to.clone()) {
+        // Align with v2: enforce valid transfer routes (reuses the
+        // already-fetched participant records — no extra storage reads).
+        if !Self::role_transition_allowed(&from_participant, &to_participant) {
             panic!("Invalid transfer: role combination not allowed");
         }
 
