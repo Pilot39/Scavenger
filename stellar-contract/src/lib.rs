@@ -3949,11 +3949,15 @@ impl ScavengerContract {
         }
         let total_price = total_price_u128 as i128;
 
-        // Pay seller in tokens
-        let token_client = token::Client::new(&env, &token_address);
-        token_client.transfer(&buyer, &listing.seller, &total_price);
+        // ── Checks-effects-interactions (issue: reentrancy audit) ───────────
+        // All state mutations below happen BEFORE the external token
+        // transfer so that a malicious/misbehaving token contract cannot
+        // reenter this function (or any other) and observe or exploit a
+        // half-updated listing/stats state. Previously the token transfer
+        // was issued first, which would have let a reentrant callee see
+        // `listing.is_active == true` and purchase the same listing twice.
 
-        // Credit buyer's carbon credits
+        // Credit buyer's carbon credits (effect)
         let mut buyer_stats: RecyclingStats = env
             .storage()
             .instance()
@@ -3973,6 +3977,11 @@ impl ScavengerContract {
             .set(&("carb_list", listing_id), &listing);
 
         Self::remove_active_listing(&env, listing_id);
+
+        // Pay seller in tokens (interaction — external cross-contract call,
+        // performed last, after all state above is already committed)
+        let token_client = token::Client::new(&env, &token_address);
+        token_client.transfer(&buyer, &listing.seller, &total_price);
 
         events::emit_carbon_listing_purchased(
             &env,
@@ -5542,6 +5551,25 @@ impl ScavengerContract {
         let owner_share = (total_reward * (owner_pct as i128)) / 100;
         let mut total_distributed: i128 = 0;
 
+        // ── Checks-effects-interactions (issue: reentrancy audit) ───────────
+        // Commit the incentive-budget effect BEFORE issuing any external
+        // token transfers below. Previously `incentive.remaining_budget`
+        // was only decremented after every transfer had already been made,
+        // so a malicious token contract that reentered `distribute_reward`
+        // (or another budget-checking function) mid-loop would still see
+        // the pre-transfer budget and could drain more than `remaining_budget`
+        // allows. `total_reward` is fully computed above and does not change
+        // based on the loop below, so moving this update earlier is safe and
+        // does not alter the amounts paid out.
+        incentive.remaining_budget = incentive
+            .remaining_budget
+            .saturating_sub(total_reward as u64);
+        if incentive.remaining_budget == 0 {
+            incentive.active = false;
+        }
+        Self::set_incentive(&env, incentive_id, &incentive);
+        Self::add_to_total_tokens(&env, total_reward as u128);
+
         for transfer in transfers.iter() {
             let key = (transfer.to.clone(),);
             if let Some(p) = env.storage().instance().get::<_, Participant>(&key) {
@@ -5575,15 +5603,6 @@ impl ScavengerContract {
                 waste_id,
             );
         }
-
-        incentive.remaining_budget = incentive
-            .remaining_budget
-            .saturating_sub(total_reward as u64);
-        if incentive.remaining_budget == 0 {
-            incentive.active = false;
-        }
-        Self::set_incentive(&env, incentive_id, &incentive);
-        Self::add_to_total_tokens(&env, total_reward as u128);
 
         total_reward
     }
