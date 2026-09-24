@@ -7,6 +7,7 @@
 pub mod errors;
 mod events;
 mod types;
+pub mod types_domains;
 mod validation;
 mod verification;
 mod upgrade;
