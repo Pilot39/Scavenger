@@ -519,6 +519,180 @@ mod tests {
         }
     }
 
+    // ── Chain ID uniqueness ──────────────────────────────────────────────
+
+    #[test]
+    fn test_all_chain_ids_are_unique() {
+        let stellar = ChainAbstraction::get_chain_config(BlockchainNetwork::Stellar);
+        let ethereum = ChainAbstraction::get_chain_config(BlockchainNetwork::Ethereum);
+        let polygon = ChainAbstraction::get_chain_config(BlockchainNetwork::Polygon);
+        let arbitrum = ChainAbstraction::get_chain_config(BlockchainNetwork::Arbitrum);
+
+        let mut ids = vec![stellar.chain_id, ethereum.chain_id, polygon.chain_id, arbitrum.chain_id];
+        let original_len = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), original_len, "chain IDs are not unique");
+    }
+
+    // ── RPC URL consistency ──────────────────────────────────────────────
+
+    #[test]
+    fn test_rpc_url_protocols_are_https() {
+        let networks = [
+            BlockchainNetwork::Stellar,
+            BlockchainNetwork::Ethereum,
+            BlockchainNetwork::Polygon,
+            BlockchainNetwork::Arbitrum,
+        ];
+        for network in networks {
+            let config = ChainAbstraction::get_chain_config(network);
+            assert!(
+                config.rpc_url.starts_with("https://"),
+                "RPC URL for {network:?} does not start with https://"
+            );
+        }
+    }
+
+    // ── Contract address format ──────────────────────────────────────────
+
+    #[test]
+    fn test_stellar_contract_address_format() {
+        let config = ChainAbstraction::get_chain_config(BlockchainNetwork::Stellar);
+        // Stellar contract addresses start with 'C'
+        assert!(config.contract_address.starts_with('C'));
+    }
+
+    #[test]
+    fn test_ethereum_contract_address_is_hex() {
+        let config = ChainAbstraction::get_chain_config(BlockchainNetwork::Ethereum);
+        assert!(config.contract_address.starts_with("0x"));
+    }
+
+    #[test]
+    fn test_polygon_contract_address_is_hex() {
+        let config = ChainAbstraction::get_chain_config(BlockchainNetwork::Polygon);
+        assert!(config.contract_address.starts_with("0x"));
+    }
+
+    #[test]
+    fn test_arbitrum_contract_address_is_hex() {
+        let config = ChainAbstraction::get_chain_config(BlockchainNetwork::Arbitrum);
+        assert!(config.contract_address.starts_with("0x"));
+    }
+
+    // ── Transaction ID consistency ───────────────────────────────────────
+
+    #[test]
+    fn test_transaction_id_consistent_format() {
+        let tx = ChainAbstraction::create_cross_chain_transaction(
+            BlockchainNetwork::Stellar,
+            BlockchainNetwork::Ethereum,
+        );
+        assert!(tx.transaction_id.starts_with("tx_"));
+        let uuid_part = tx.transaction_id.strip_prefix("tx_").unwrap();
+        assert_eq!(uuid_part.len(), 36); // Standard UUID v4 length
+    }
+
+    #[test]
+    fn test_multiple_transaction_ids_are_unique() {
+        let tx_ids: Vec<String> = (0..20)
+            .map(|_| {
+                ChainAbstraction::create_cross_chain_transaction(
+                    BlockchainNetwork::Ethereum,
+                    BlockchainNetwork::Polygon,
+                )
+                .transaction_id
+            })
+            .collect();
+
+        // Verify uniqueness
+        for i in 0..tx_ids.len() {
+            for j in (i + 1)..tx_ids.len() {
+                assert_ne!(tx_ids[i], tx_ids[j], "duplicate IDs at indices {} and {}", i, j);
+            }
+        }
+    }
+
+    // ── Struct field consistency ─────────────────────────────────────────
+
+    #[test]
+    fn test_chain_config_all_fields_populated() {
+        let networks = [
+            BlockchainNetwork::Stellar,
+            BlockchainNetwork::Ethereum,
+            BlockchainNetwork::Polygon,
+            BlockchainNetwork::Arbitrum,
+        ];
+        for network in networks {
+            let config = ChainAbstraction::get_chain_config(network);
+            assert!(!config.rpc_url.is_empty(), "{network:?} missing rpc_url");
+            assert!(!config.contract_address.is_empty(), "{network:?} missing contract_address");
+            assert_eq!(config.network, network, "{network:?} network mismatch");
+        }
+    }
+
+    #[test]
+    fn test_cross_chain_transaction_all_fields_populated() {
+        let tx = ChainAbstraction::create_cross_chain_transaction(
+            BlockchainNetwork::Stellar,
+            BlockchainNetwork::Ethereum,
+        );
+        assert!(!tx.transaction_id.is_empty());
+        assert_eq!(tx.source_chain, BlockchainNetwork::Stellar);
+        assert_eq!(tx.target_chain, BlockchainNetwork::Ethereum);
+        assert_eq!(tx.status, TransactionStatus::Pending);
+    }
+
+    // ── Idempotency and immutability ─────────────────────────────────────
+
+    #[test]
+    fn test_get_chain_config_returns_fresh_instance() {
+        let config1 = ChainAbstraction::get_chain_config(BlockchainNetwork::Stellar);
+        let config2 = ChainAbstraction::get_chain_config(BlockchainNetwork::Stellar);
+
+        // Both should have identical values
+        assert_eq!(config1.network, config2.network);
+        assert_eq!(config1.rpc_url, config2.rpc_url);
+        assert_eq!(config1.contract_address, config2.contract_address);
+        assert_eq!(config1.chain_id, config2.chain_id);
+    }
+
+    #[test]
+    fn test_create_cross_chain_transaction_always_pending() {
+        let transactions: Vec<_> = (0..5)
+            .map(|_| {
+                ChainAbstraction::create_cross_chain_transaction(
+                    BlockchainNetwork::Ethereum,
+                    BlockchainNetwork::Polygon,
+                )
+            })
+            .collect();
+
+        for tx in &transactions {
+            assert_eq!(tx.status, TransactionStatus::Pending);
+        }
+    }
+
+    // ── Network parameter validation ─────────────────────────────────────
+
+    #[test]
+    fn test_symmetric_cross_chain_pairs() {
+        let pairs = [
+            (BlockchainNetwork::Stellar, BlockchainNetwork::Ethereum),
+            (BlockchainNetwork::Ethereum, BlockchainNetwork::Stellar),
+            (BlockchainNetwork::Polygon, BlockchainNetwork::Arbitrum),
+            (BlockchainNetwork::Arbitrum, BlockchainNetwork::Polygon),
+        ];
+
+        for (source, target) in pairs {
+            let tx = ChainAbstraction::create_cross_chain_transaction(source, target);
+            assert_eq!(tx.source_chain, source);
+            assert_eq!(tx.target_chain, target);
+        }
+    }
+}
+
     // ── generate_tx_id format and uniqueness ─────────────────────────────────
 
     #[test]
