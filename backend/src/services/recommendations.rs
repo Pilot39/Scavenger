@@ -604,4 +604,210 @@ mod tests {
         assert_eq!(req.location, cloned.location);
         assert_eq!(req.waste_history, cloned.waste_history);
     }
+
+    // ── Confidence floor verification (0.2 minimum) ────────────────────────
+
+    #[test]
+    fn confidence_floor_zero_history() {
+        let req = make_request("floor_test", vec![]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        // Empty history should produce no recommendations (all below 0.3 threshold)
+        assert_eq!(recs.len(), 0);
+    }
+
+    #[test]
+    fn confidence_floor_non_matching_history() {
+        let req = make_request("floor_non_match", vec!["rubber", "ceramic", "wood"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        // No waste types match, all get floor score of 0.2 which is below 0.3
+        assert_eq!(recs.len(), 0);
+    }
+
+    // ── Specific confidence calculations ──────────────────────────────────
+
+    #[test]
+    fn confidence_exact_threshold_boundary() {
+        // (1/8)*0.8 + 0.2 = 0.1 + 0.2 = 0.3 (should NOT be included)
+        let req = make_request("boundary", vec!["plastic", "metal", "paper", "glass", "rubber", "ceramic", "wood", "stone"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        let plastic = recs.iter().find(|r| r.waste_type == "plastic");
+        // Score is exactly 0.3, which is NOT > 0.3, so excluded
+        assert!(plastic.is_none());
+    }
+
+    #[test]
+    fn confidence_just_above_boundary() {
+        // (2/7)*0.8 + 0.2 = 0.228... + 0.2 = 0.428... (should be included)
+        let req = make_request("above", vec!["plastic", "plastic", "metal", "paper", "glass", "rubber", "ceramic"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        let plastic = recs.iter().find(|r| r.waste_type == "plastic");
+        assert!(plastic.is_some());
+        assert!(plastic.unwrap().confidence_score > 0.3);
+    }
+
+    // ── Multiple recommendations ordering ────────────────────────────────
+
+    #[test]
+    fn multiple_recs_strictly_descending() {
+        let req = make_request("desc", vec!["plastic", "plastic", "plastic", "metal", "metal", "paper", "glass"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+
+        for i in 0..recs.len() - 1 {
+            assert!(
+                recs[i].confidence_score >= recs[i + 1].confidence_score,
+                "recommendation {} has lower score than {}",
+                i,
+                i + 1
+            );
+        }
+    }
+
+    // ── Reward calculation precision ─────────────────────────────────────
+
+    #[test]
+    fn reward_truncation_to_u128() {
+        let req = make_request("reward_prec", vec!["plastic", "plastic", "plastic"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        let plastic = recs.iter().find(|r| r.waste_type == "plastic").unwrap();
+
+        let expected_confidence = (3.0 / 3.0) * 0.8 + 0.2; // = 1.0
+        let expected_reward = (100.0 * expected_confidence) as u128;
+        assert_eq!(plastic.estimated_reward, expected_reward);
+    }
+
+    #[test]
+    fn reward_for_confidence_0_4() {
+        // Build history that yields confidence 0.4
+        let req = make_request("r040", vec!["metal", "plastic", "paper", "glass", "rubber"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        let metal = recs.iter().find(|r| r.waste_type == "metal").unwrap();
+
+        let expected = (100.0 * metal.confidence_score) as u128;
+        assert_eq!(metal.estimated_reward, expected);
+    }
+
+    // ── Substring matching edge cases ────────────────────────────────────
+
+    #[test]
+    fn substring_match_partial_word() {
+        let req = make_request("partial", vec!["plast"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        let plastic = recs.iter().find(|r| r.waste_type == "plastic");
+        assert!(plastic.is_some());
+    }
+
+    #[test]
+    fn substring_match_extended_word() {
+        let req = make_request("extended", vec!["plastic_container"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        let plastic = recs.iter().find(|r| r.waste_type == "plastic");
+        assert!(plastic.is_some());
+    }
+
+    #[test]
+    fn no_substring_match_different_case() {
+        let req = make_request("case_diff", vec!["PLASTIC"]);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        let plastic = recs.iter().find(|r| r.waste_type == "plastic");
+        assert!(plastic.is_none()); // Case-sensitive, so no match
+    }
+
+    // ── Location handling ────────────────────────────────────────────────
+
+    #[test]
+    fn location_extreme_north() {
+        let mut req = make_request("north", vec!["plastic"]);
+        req.location = (90.0, 0.0);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        assert_eq!(recs[0].collection_location, (90.0, 0.0));
+    }
+
+    #[test]
+    fn location_extreme_south() {
+        let mut req = make_request("south", vec!["plastic"]);
+        req.location = (-90.0, 0.0);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        assert_eq!(recs[0].collection_location, (-90.0, 0.0));
+    }
+
+    #[test]
+    fn location_extreme_east() {
+        let mut req = make_request("east", vec!["plastic"]);
+        req.location = (0.0, 180.0);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        assert_eq!(recs[0].collection_location, (0.0, 180.0));
+    }
+
+    #[test]
+    fn location_extreme_west() {
+        let mut req = make_request("west", vec!["plastic"]);
+        req.location = (0.0, -180.0);
+        let recs = RecommendationEngine::generate_recommendations(req);
+        assert_eq!(recs[0].collection_location, (0.0, -180.0));
+    }
+
+    // ── Recommendation output consistency ────────────────────────────────
+
+    #[test]
+    fn same_history_order_produces_same_confidence() {
+        let hist1 = vec!["plastic", "metal", "paper"];
+        let hist2 = vec!["plastic", "metal", "paper"];
+
+        let req1 = make_request("user1", hist1);
+        let req2 = make_request("user2", hist2);
+
+        let recs1 = RecommendationEngine::generate_recommendations(req1);
+        let recs2 = RecommendationEngine::generate_recommendations(req2);
+
+        for (r1, r2) in recs1.iter().zip(recs2.iter()) {
+            assert_eq!(r1.waste_type, r2.waste_type);
+            assert!((r1.confidence_score - r2.confidence_score).abs() < f64::EPSILON);
+        }
+    }
+
+    #[test]
+    fn different_participant_ids_same_history() {
+        let hist = vec!["plastic", "metal", "paper"];
+        let req1 = make_request("user_a", hist.clone());
+        let req2 = make_request("user_b", hist);
+
+        let recs1 = RecommendationEngine::generate_recommendations(req1);
+        let recs2 = RecommendationEngine::generate_recommendations(req2);
+
+        // Recommendations should be identical except participant_id is not in output
+        assert_eq!(recs1.len(), recs2.len());
+        for (r1, r2) in recs1.iter().zip(recs2.iter()) {
+            assert_eq!(r1.waste_type, r2.waste_type);
+            assert_eq!(r1.confidence_score, r2.confidence_score);
+            assert_eq!(r1.collection_location, r2.collection_location);
+            assert_eq!(r1.estimated_reward, r2.estimated_reward);
+        }
+    }
+
+    // ── Edge case: very high waste type count ────────────────────────────
+
+    #[test]
+    fn history_100k_entries() {
+        let mut history = vec![];
+        for i in 0..100_000 {
+            if i % 4 == 0 {
+                history.push("plastic");
+            } else if i % 4 == 1 {
+                history.push("metal");
+            } else if i % 4 == 2 {
+                history.push("paper");
+            } else {
+                history.push("glass");
+            }
+        }
+
+        let req = make_request("huge", history);
+        let recs = RecommendationEngine::generate_recommendations(req);
+
+        // All four waste types should appear with equal confidence
+        assert_eq!(recs.len(), 4);
+        for rec in &recs {
+            assert!((rec.confidence_score - 0.45).abs() < 1e-10);
+        }
+    }
 }
