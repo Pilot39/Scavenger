@@ -1,17 +1,36 @@
 use chrono::{DateTime, Utc};
 /// #802 - Notification Delivery Service
-/// Multi-channel (email, SMS, push) with retry logic, delivery tracking, and templates.
+/// Multi-channel (email, SMS, push, webhook) with retry logic, delivery
+/// tracking, and templates.
 ///
 /// #1087: this module owns *how* a notification reaches a channel — the wire
 /// protocol / provider API call, retry policy, and delivery-status tracking
-/// for each `ChannelSender`. Deciding *what* to send and *when* (device
+/// for each `NotificationChannel`. Deciding *what* to send and *when* (device
 /// registration, user preferences, scheduling) lives in `notifications.rs`,
-/// which delegates the actual send to a `ChannelSender` from this module.
+/// which delegates the actual send to a channel from this module.
+///
+/// Each delivery channel (email, sms, push, webhook) lives in its own
+/// submodule behind the shared `NotificationChannel` trait, so channels can
+/// be added, tested, and reasoned about independently instead of as one
+/// monolithic file.
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use uuid::Uuid;
+
+pub mod email;
+pub mod push;
+pub mod sms;
+pub mod transport;
+pub mod webhook;
+
+pub use email::EmailSender;
+pub use push::PushSender;
+pub use sms::SmsSender;
+pub use transport::{HttpTransport, ReqwestTransport};
+pub use webhook::WebhookSender;
 
 // ── Errors ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +56,7 @@ pub enum Channel {
     Email,
     Sms,
     Push,
+    Webhook,
 }
 
 // ── Templates ─────────────────────────────────────────────────────────────────
@@ -96,7 +116,7 @@ pub struct DeliveryRecord {
 pub struct NotificationRequest {
     /// Which channels to deliver over.
     pub channels: Vec<Channel>,
-    /// Recipient address per channel (email addr, phone number, device token).
+    /// Recipient address per channel (email addr, phone number, device token, webhook URL).
     pub recipients: HashMap<Channel, String>,
     /// Template ID to use (or provide `subject`+`body` directly).
     pub template_id: Option<String>,
@@ -114,116 +134,21 @@ pub struct NotificationResult {
     pub records: Vec<DeliveryRecord>,
 }
 
-// ── Channel sender trait ──────────────────────────────────────────────────────
+// ── Channel trait ─────────────────────────────────────────────────────────────
 
-#[async_trait::async_trait]
-pub trait ChannelSender: Send + Sync {
+/// Common contract implemented by every delivery channel submodule
+/// (email, sms, push, webhook). The delivery service is generic over this
+/// trait so it never needs to know which concrete transport a channel uses.
+#[async_trait]
+pub trait NotificationChannel: Send + Sync {
     fn channel(&self) -> Channel;
     async fn send(&self, recipient: &str, subject: &str, body: &str) -> Result<(), DeliveryError>;
-}
-
-// ── Concrete senders ──────────────────────────────────────────────────────────
-
-pub struct EmailSender {
-    pub api_key: String,
-    pub from_email: String,
-}
-
-#[async_trait::async_trait]
-impl ChannelSender for EmailSender {
-    fn channel(&self) -> Channel {
-        Channel::Email
-    }
-
-    async fn send(&self, recipient: &str, subject: &str, body: &str) -> Result<(), DeliveryError> {
-        if !recipient.contains('@') {
-            return Err(DeliveryError::InvalidRecipient(recipient.to_string()));
-        }
-        // In production: call SendGrid / SES. Here we validate and succeed.
-        let _ = (&self.api_key, &self.from_email, subject, body);
-        Ok(())
-    }
-}
-
-pub struct SmsSender {
-    pub account_sid: String,
-    pub auth_token: String,
-    pub from_number: String,
-}
-
-#[async_trait::async_trait]
-impl ChannelSender for SmsSender {
-    fn channel(&self) -> Channel {
-        Channel::Sms
-    }
-
-    async fn send(&self, recipient: &str, _subject: &str, body: &str) -> Result<(), DeliveryError> {
-        if !recipient.starts_with('+') || recipient.len() < 8 {
-            return Err(DeliveryError::InvalidRecipient(recipient.to_string()));
-        }
-        // In production: call Twilio API.
-        let _ = (&self.account_sid, &self.auth_token, &self.from_number, body);
-        Ok(())
-    }
-}
-
-pub struct PushSender {
-    pub firebase_project_id: String,
-}
-
-#[async_trait::async_trait]
-impl ChannelSender for PushSender {
-    fn channel(&self) -> Channel {
-        Channel::Push
-    }
-
-    async fn send(&self, recipient: &str, subject: &str, body: &str) -> Result<(), DeliveryError> {
-        if recipient.len() < 10 {
-            return Err(DeliveryError::InvalidRecipient(recipient.to_string()));
-        }
-
-        // #1087: moved from notifications.rs::FirebaseNotificationService,
-        // which now delegates here instead of calling FCM itself — this is
-        // the single place push notifications actually go out over the wire.
-        let client = reqwest::Client::new();
-        let payload = serde_json::json!({
-            "message": {
-                "token": recipient,
-                "notification": {
-                    "title": subject,
-                    "body": body
-                }
-            }
-        });
-
-        let response = client
-            .post(format!(
-                "https://fcm.googleapis.com/v1/projects/{}/messages:send",
-                self.firebase_project_id
-            ))
-            .json(&payload)
-            .send()
-            .await
-            .map_err(|e| DeliveryError::ChannelError {
-                channel: "push".to_string(),
-                msg: e.to_string(),
-            })?;
-
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            Err(DeliveryError::ChannelError {
-                channel: "push".to_string(),
-                msg: format!("FCM request failed with status {}", response.status()),
-            })
-        }
-    }
 }
 
 // ── Delivery service ──────────────────────────────────────────────────────────
 
 pub struct NotificationDeliveryService {
-    senders: HashMap<Channel, Arc<dyn ChannelSender>>,
+    senders: HashMap<Channel, Arc<dyn NotificationChannel>>,
     templates: Mutex<HashMap<String, NotificationTemplate>>,
     records: Mutex<Vec<DeliveryRecord>>,
     max_retries: u32,
@@ -239,7 +164,7 @@ impl NotificationDeliveryService {
         }
     }
 
-    pub fn register_sender(mut self, sender: Arc<dyn ChannelSender>) -> Self {
+    pub fn register_sender(mut self, sender: Arc<dyn NotificationChannel>) -> Self {
         self.senders.insert(sender.channel(), sender);
         self
     }
@@ -383,8 +308,6 @@ impl NotificationDeliveryService {
     }
 }
 
-// ── Builder helpers ───────────────────────────────────────────────────────────
-
 impl Default for NotificationDeliveryService {
     fn default() -> Self {
         Self::new(3)
@@ -409,9 +332,8 @@ mod tests {
                 auth_token: "tok".to_string(),
                 from_number: "+10000000000".to_string(),
             }))
-            .register_sender(Arc::new(PushSender {
-                firebase_project_id: "proj".to_string(),
-            }))
+            .register_sender(Arc::new(PushSender::new("proj")))
+            .register_sender(Arc::new(WebhookSender::new()))
     }
 
     fn waste_transfer_template() -> NotificationTemplate {
@@ -482,11 +404,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_multichannel_send() {
-        // #1087: Push is intentionally excluded here — PushSender now makes a
-        // real FCM call (moved from notifications.rs, see the module doc
-        // comment above), so it needs network access/credentials and isn't
-        // exercised by this offline unit test. Email/Sms remain simulated
-        // sends and stay deterministic.
+        // Push is intentionally excluded here — PushSender's default transport
+        // makes a real FCM call, so it needs network access/credentials and
+        // isn't exercised by this offline unit test. Email/Sms remain
+        // simulated sends and stay deterministic.
         let svc = make_service();
         let mut recipients = HashMap::new();
         recipients.insert(Channel::Email, "u@example.com".to_string());
@@ -541,15 +462,24 @@ mod tests {
         assert_eq!(fetched[0].status, DeliveryStatus::Sent);
     }
 
-    #[test]
-    fn test_sms_sender_invalid_number() {
-        let sender = SmsSender {
-            account_sid: "sid".to_string(),
-            auth_token: "tok".to_string(),
-            from_number: "+1".to_string(),
+    #[tokio::test]
+    async fn test_no_sender_registered_for_channel() {
+        // Webhook sender not registered on this service instance.
+        let svc = NotificationDeliveryService::new(1).register_sender(Arc::new(EmailSender {
+            api_key: "key".to_string(),
+            from_email: "no-reply@scavngr.io".to_string(),
+        }));
+        let mut recipients = HashMap::new();
+        recipients.insert(Channel::Webhook, "https://example.com/hook".to_string());
+        let req = NotificationRequest {
+            channels: vec![Channel::Webhook],
+            recipients,
+            template_id: None,
+            template_vars: HashMap::new(),
+            subject: Some("x".to_string()),
+            body: Some("x".to_string()),
         };
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let result = rt.block_on(sender.send("bad", "s", "b"));
-        assert!(result.is_err());
+        let result = svc.send(req).await.unwrap();
+        assert_eq!(result.records[0].status, DeliveryStatus::Failed);
     }
 }
