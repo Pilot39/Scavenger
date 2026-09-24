@@ -28,8 +28,7 @@ use api::{
 use cache::{Cache, CacheInvalidationManager};
 use config::AppConfig;
 use middleware::{
-    CsrfMiddleware, IdempotencyMiddleware, RateLimitConfig, RateLimitMiddleware, RequestIdMiddleware,
-    ValidationMiddleware,
+    IdempotencyMiddleware, RateLimitConfig, RateLimitMiddleware, RequestIdMiddleware, ValidationMiddleware,
 };
 use rpc::{StellarRpcClient, StellarRpcConfig};
 // analytics API removed — legacy unregistered routes cleaned up (#906)
@@ -123,16 +122,19 @@ async fn main() -> std::io::Result<()> {
             // out.  The sequence below guarantees that `RequestIdMiddleware` is the
             // very first middleware to run on the inbound path, so that a request ID
             // is present in the request extensions before any downstream middleware
-            // (rate-limit, CSRF, validation, idempotency) can short-circuit with an
+            // (rate-limit, validation, idempotency) can short-circuit with an
             // early error response.
             //
             // Inbound execution order (first → last):
             //   1. RequestIdMiddleware    — assign / echo x-request-id
             //   2. ValidationMiddleware  — reject malformed Content-Type / payloads
             //   3. RateLimitMiddleware   — reject over-quota requests (429)
-            //   4. CsrfMiddleware        — reject CSRF violations (403)
-            //   5. IdempotencyMiddleware — deduplicate write operations
+            //   4. IdempotencyMiddleware — deduplicate write operations
             //   (application handlers)
+            //
+            // #1158: CsrfMiddleware was removed from `middleware/` — it was
+            // never registered here, so it was dead code left over from an
+            // earlier auth scheme.
             //
             // Because actix-web wraps in reverse, RequestIdMiddleware must be
             // registered *last* in the `.wrap()` chain so it executes *first*.
