@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use crate::cache::ttl::{keys as cache_keys, CacheTtl};
 use crate::cache::{Cache, CacheInvalidationManager, InvalidationEvent};
-use crate::api::pagination::paginate;
+use crate::api::pagination::{paginate, PaginationParams};
 use crate::services::api::{ApiBuilder, PaginatedResponse};
 use crate::validation::{error_response, validate_pagination};
 
@@ -122,13 +122,11 @@ pub async fn list_wastes(
     cache: web::Data<Cache>,
     query: web::Query<WasteQueryParams>,
 ) -> HttpResponse {
-    let page = query.page.unwrap_or(1);
-    let limit = query.limit.unwrap_or(20);
-
-    let errors = validate_pagination(page, limit);
-    if !errors.is_empty() {
-        return error_response(&errors);
-    }
+    let pagination = match PaginationParams::resolve(query.page, query.limit) {
+        Ok(p) => p,
+        Err(errors) => return error_response(&errors),
+    };
+    let (page, limit) = (pagination.page, pagination.limit);
 
     let cache_key = cache_keys::waste_list(&query_string(&req));
     if let Some(cached) = cache.get(&cache_key) {
@@ -231,13 +229,11 @@ pub async fn list_participants(
     cache: web::Data<Cache>,
     query: web::Query<ParticipantQueryParams>,
 ) -> HttpResponse {
-    let page = query.page.unwrap_or(1);
-    let limit = query.limit.unwrap_or(20);
-
-    let errors = validate_pagination(page, limit);
-    if !errors.is_empty() {
-        return error_response(&errors);
-    }
+    let pagination = match PaginationParams::resolve(query.page, query.limit) {
+        Ok(p) => p,
+        Err(errors) => return error_response(&errors),
+    };
+    let (page, limit) = (pagination.page, pagination.limit);
 
     let cache_key = cache_keys::participant_list(&query_string(&req));
     if let Some(cached) = cache.get(&cache_key) {

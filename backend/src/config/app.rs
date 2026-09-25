@@ -59,6 +59,16 @@ impl AppConfig {
     /// Currently enforces:
     /// * `CSRF_SECRET` must not be the insecure default in production.
     ///   "Production" is detected by the absence of `ALLOW_INSECURE_CSRF=1`.
+    /// * `LOG_FORMAT` must be one of the recognized values (`json`, `pretty`).
+    /// * `ALLOWED_ORIGINS` must not be empty and must contain only
+    ///   well-formed `http(s)://` origins.
+    /// * `REDIS_URL`, when set, must be a well-formed `redis://` /
+    ///   `rediss://` URL.
+    ///
+    /// This is the single fail-fast gate called from `main()` at startup —
+    /// any `Err` here should abort process startup with the returned
+    /// message rather than let the server run with silently-misconfigured
+    /// values.
     pub fn validate(&self) -> Result<(), String> {
         let allow_insecure = std::env::var("ALLOW_INSECURE_CSRF")
             .map(|v| v == "1" || v.to_lowercase() == "true")
@@ -71,6 +81,43 @@ impl AppConfig {
                     .to_string(),
             );
         }
+
+        let normalized_format = self.log_format.to_lowercase();
+        if normalized_format != "json" && normalized_format != "pretty" {
+            return Err(format!(
+                "LOG_FORMAT must be one of \"json\" or \"pretty\", got {:?}.",
+                self.log_format
+            ));
+        }
+
+        if self.allowed_origins.trim().is_empty() {
+            return Err("ALLOWED_ORIGINS must not be empty.".to_string());
+        }
+        for origin in self.allowed_origins.split(',') {
+            let origin = origin.trim();
+            if origin.is_empty() {
+                return Err(
+                    "ALLOWED_ORIGINS contains an empty entry (check for stray commas)."
+                        .to_string(),
+                );
+            }
+            if !origin.starts_with("http://") && !origin.starts_with("https://") {
+                return Err(format!(
+                    "ALLOWED_ORIGINS entry {:?} is not a valid http(s):// origin.",
+                    origin
+                ));
+            }
+        }
+
+        if let Some(ref url) = self.redis_url {
+            if !url.starts_with("redis://") && !url.starts_with("rediss://") {
+                return Err(format!(
+                    "REDIS_URL {:?} is not a valid redis:// or rediss:// URL.",
+                    url
+                ));
+            }
+        }
+
         Ok(())
     }
 
@@ -168,6 +215,82 @@ mod tests {
             csrf_secret: "super-strong-random-secret-xyz".to_string(),
             allowed_origins: "http://localhost:3000".to_string(),
             redis_url: None,
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    // ── validate: LOG_FORMAT ──────────────────────────────────────────────
+
+    #[test]
+    fn test_validate_rejects_invalid_log_format() {
+        let cfg = AppConfig {
+            log_format: "yaml".to_string(),
+            csrf_secret: "super-strong-random-secret-xyz".to_string(),
+            allowed_origins: "http://localhost:3000".to_string(),
+            redis_url: None,
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.contains("LOG_FORMAT"));
+    }
+
+    // ── validate: ALLOWED_ORIGINS ─────────────────────────────────────────
+
+    #[test]
+    fn test_validate_rejects_empty_allowed_origins() {
+        let cfg = AppConfig {
+            log_format: "pretty".to_string(),
+            csrf_secret: "super-strong-random-secret-xyz".to_string(),
+            allowed_origins: "   ".to_string(),
+            redis_url: None,
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.contains("ALLOWED_ORIGINS"));
+    }
+
+    #[test]
+    fn test_validate_rejects_malformed_origin() {
+        let cfg = AppConfig {
+            log_format: "pretty".to_string(),
+            csrf_secret: "super-strong-random-secret-xyz".to_string(),
+            allowed_origins: "not-a-url".to_string(),
+            redis_url: None,
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.contains("not-a-url"));
+    }
+
+    #[test]
+    fn test_validate_accepts_multiple_valid_origins() {
+        let cfg = AppConfig {
+            log_format: "pretty".to_string(),
+            csrf_secret: "super-strong-random-secret-xyz".to_string(),
+            allowed_origins: "http://localhost:3000,https://app.example.com".to_string(),
+            redis_url: None,
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    // ── validate: REDIS_URL ───────────────────────────────────────────────
+
+    #[test]
+    fn test_validate_rejects_malformed_redis_url() {
+        let cfg = AppConfig {
+            log_format: "pretty".to_string(),
+            csrf_secret: "super-strong-random-secret-xyz".to_string(),
+            allowed_origins: "http://localhost:3000".to_string(),
+            redis_url: Some("localhost:6379".to_string()),
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.contains("REDIS_URL"));
+    }
+
+    #[test]
+    fn test_validate_accepts_well_formed_redis_url() {
+        let cfg = AppConfig {
+            log_format: "pretty".to_string(),
+            csrf_secret: "super-strong-random-secret-xyz".to_string(),
+            allowed_origins: "http://localhost:3000".to_string(),
+            redis_url: Some("redis://localhost:6379".to_string()),
         };
         assert!(cfg.validate().is_ok());
     }

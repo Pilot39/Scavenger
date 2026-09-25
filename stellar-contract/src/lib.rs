@@ -240,48 +240,15 @@ const MILESTONE_THRESHOLDS: [u128; 7] = [
     100_000_000,
 ];
 
-/// Actions that require multi-sig approval.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AdminAction {
-    TransferAdmin(Vec<Address>),
-    SetPercentages(u32, u32),
-    DeactivateWaste(u128),
-}
-
-/// A pending multi-sig proposal.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AdminProposal {
-    pub id: u64,
-    pub action: AdminAction,
-    pub proposer: Address,
-    pub approvers: Vec<Address>,
-    pub executed: bool,
-    pub created_at: u64,
-}
+// #1085: AdminAction, AdminProposal, and RewardConfig previously lived here
+// inline; their definitions now live in `admin.rs` (the module boundary for
+// admin/multisig/reward-config concerns) and are re-exported below so the
+// public path `crate::{AdminAction, AdminProposal, RewardConfig}` — and thus
+// the contract ABI — is unchanged.
+pub use crate::admin::{AdminAction, AdminProposal, RewardConfig};
 
 /// Maximum allowed waste weight per submission (1 000 000 kg in grams).
 const MAX_WASTE_WEIGHT: u128 = 1_000_000_000;
-
-/// Reward distribution percentages stored as a single instance-storage entry.
-///
-/// Consolidating `collector_percentage` and `owner_percentage` into one struct
-/// means a single `storage.get` call fetches both values, halving the number
-/// of instance-storage lookups on every `_reward_tokens` invocation.
-///
-/// Migration note: contracts deployed with the old two-key layout
-/// (`COL_PCT` / `OWN_PCT`) should call `set_percentages` once after upgrade
-/// to write the new `RWD_CFG` key; the old keys are then unused and will
-/// expire with the instance TTL.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RewardConfig {
-    /// Percentage of total reward distributed to each collector in the transfer chain.
-    pub collector_percentage: u32,
-    /// Percentage of total reward distributed to the current waste owner.
-    pub owner_percentage: u32,
-}
 
 /// On-chain record for a registered supply-chain participant.
 ///
