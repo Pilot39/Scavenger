@@ -1,4 +1,4 @@
-use crate::services::notification_delivery::{ChannelSender, PushSender};
+use crate::services::notification_delivery::{NotificationChannel, PushSender};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -6,7 +6,7 @@ use thiserror::Error;
 
 // #1087: this module owns *what* to notify and *when* — device registration,
 // user preferences, and scheduling decisions. The actual wire send (the
-// "how") is delegated to a `ChannelSender` from `notification_delivery.rs`,
+// "how") is delegated to a `NotificationChannel` from `notification_delivery`,
 // which is also where retry/delivery-tracking logic for that send lives.
 
 #[derive(Debug, Error)]
@@ -61,14 +61,12 @@ pub trait NotificationService: Send + Sync {
 }
 
 pub struct FirebaseNotificationService {
-    sender: Arc<dyn ChannelSender>,
+    sender: Arc<dyn NotificationChannel>,
 }
 
 impl FirebaseNotificationService {
     pub fn new(project_id: String) -> Self {
-        let sender = Arc::new(PushSender {
-            firebase_project_id: project_id,
-        });
+        let sender = Arc::new(PushSender::new(project_id));
         Self { sender }
     }
 
