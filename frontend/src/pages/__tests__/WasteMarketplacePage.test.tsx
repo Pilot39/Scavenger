@@ -164,4 +164,167 @@ describe('WasteMarketplacePage — averageRating', () => {
   it('returns single rating when only one entry', () => {
     expect(averageRating(ratings, 'l2')).toBe(5)
   })
+
+  it('handles multiple ratings correctly', () => {
+    const multiRatings: RatingEntry[] = [
+      { listingId: 'l1', rater: 'G1', score: 5, comment: '' },
+      { listingId: 'l1', rater: 'G2', score: 5, comment: '' },
+      { listingId: 'l1', rater: 'G3', score: 5, comment: '' },
+    ]
+    expect(averageRating(multiRatings, 'l1')).toBe(5)
+  })
+
+  it('rounds average correctly', () => {
+    const roundRatings: RatingEntry[] = [
+      { listingId: 'l1', rater: 'G1', score: 3, comment: '' },
+      { listingId: 'l1', rater: 'G2', score: 4, comment: '' },
+    ]
+    expect(averageRating(roundRatings, 'l1')).toBe(3.5)
+  })
+
+  it('filters ratings by listing ID correctly', () => {
+    const multiListingRatings: RatingEntry[] = [
+      { listingId: 'l1', rater: 'G1', score: 1, comment: '' },
+      { listingId: 'l2', rater: 'G2', score: 5, comment: '' },
+      { listingId: 'l2', rater: 'G3', score: 5, comment: '' },
+    ]
+    expect(averageRating(multiListingRatings, 'l1')).toBe(1)
+    expect(averageRating(multiListingRatings, 'l2')).toBe(5)
+  })
+})
+
+// ── Marketplace listing operations ────────────────────────────────────────────
+
+describe('WasteMarketplacePage — listing operations', () => {
+  it('handles listings with zero weight', () => {
+    const zeroWeightListing: MarketplaceListing = {
+      id: 'zero',
+      seller: 'GZERO',
+      wasteType: WasteType.Plastic,
+      weight: 0,
+      pricePerKg: 0,
+      description: 'empty',
+      listedAt: 1000,
+      rating: 0,
+    }
+    const result = filterListings([zeroWeightListing], '', 'all')
+    expect(result).toHaveLength(1)
+  })
+
+  it('handles high price items', () => {
+    const expensiveListing: MarketplaceListing = {
+      id: 'expensive',
+      seller: 'GRICH',
+      wasteType: WasteType.Electronic,
+      weight: 1,
+      pricePerKg: 10000,
+      description: 'premium',
+      listedAt: 1000,
+      rating: 5.0,
+    }
+    const result = sortListings([expensiveListing, listings[0]], 'price_desc')
+    expect(result[0].pricePerKg).toBe(10000)
+  })
+
+  it('filters case-insensitively', () => {
+    const result = filterListings(listings, 'METAL', 'all')
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('l2')
+  })
+
+  it('handles partial word matches in description', () => {
+    const result = filterListings(listings, 'pap', 'all')
+    expect(result).toHaveLength(1)
+    expect(result[0].description).toContain('paper')
+  })
+
+  it('preserves all listing fields after sort', () => {
+    const result = sortListings([listings[0]], 'price_asc')
+    expect(result[0].seller).toBe('GABC')
+    expect(result[0].description).toBe('clean paper')
+    expect(result[0].rating).toBe(4.0)
+  })
+})
+
+// ── Offer workflow tests ──────────────────────────────────────────────────────
+
+describe('WasteMarketplacePage — offer workflow', () => {
+  it('creates offer with timestamp', () => {
+    const beforeTime = Date.now()
+    const offer = makeOffer(listings[0], 'GBUYER', 50)
+    const afterTime = Date.now()
+    expect(offer.createdAt).toBeGreaterThanOrEqual(beforeTime)
+    expect(offer.createdAt).toBeLessThanOrEqual(afterTime)
+  })
+
+  it('tracks offer response timestamp', () => {
+    const offer = makeOffer(listings[0], 'GBUYER', 50)
+    const beforeTime = Date.now()
+    const updated = respondToOffer(offer, 'accepted')
+    const afterTime = Date.now()
+    expect(updated.respondedAt).toBeGreaterThanOrEqual(beforeTime)
+    expect(updated.respondedAt).toBeLessThanOrEqual(afterTime)
+  })
+
+  it('handles offer price below list price', () => {
+    const offer = makeOffer(listings[0], 'GBUYER', 0.1)
+    expect(offer.offerPrice).toBe(0.1)
+  })
+
+  it('handles offer price above list price', () => {
+    const offer = makeOffer(listings[0], 'GBUYER', 1000)
+    expect(offer.offerPrice).toBe(1000)
+  })
+
+  it('tracks offer state changes', () => {
+    const offer = makeOffer(listings[0], 'GBUYER', 50)
+    expect(offer.status).toBe('pending')
+
+    const accepted = respondToOffer(offer, 'accepted')
+    expect(accepted.status).toBe('accepted')
+
+    const rejected = respondToOffer(offer, 'rejected')
+    expect(rejected.status).toBe('rejected')
+  })
+
+  it('maintains buyer info after response', () => {
+    const offer = makeOffer(listings[0], 'GBUYER123', 50)
+    const updated = respondToOffer(offer, 'accepted')
+    expect(updated.buyer).toBe('GBUYER123')
+  })
+})
+
+// ── Marketplace filter combinations ───────────────────────────────────────────
+
+describe('WasteMarketplacePage — complex filters', () => {
+  it('combines multiple waste types', () => {
+    const allTypes = [
+      { ...listings[0], wasteType: WasteType.Paper },
+      { ...listings[1], wasteType: WasteType.Metal },
+      { ...listings[2], wasteType: WasteType.Glass },
+    ]
+    const result = filterListings(allTypes, '', WasteType.Metal)
+    expect(result).toHaveLength(1)
+    expect(result[0].wasteType).toBe(WasteType.Metal)
+  })
+
+  it('preserves order after multiple operations', () => {
+    const sorted = sortListings(listings, 'price_asc')
+    const filtered = filterListings(sorted, '', 'all')
+    expect(filtered[0].pricePerKg).toBeLessThanOrEqual(filtered[1].pricePerKg)
+  })
+
+  it('handles empty listing array', () => {
+    expect(filterListings([], '', 'all')).toHaveLength(0)
+    expect(sortListings([], 'price_asc')).toHaveLength(0)
+  })
+
+  it('handles filters with special characters', () => {
+    const specialListing: MarketplaceListing = {
+      ...listings[0],
+      description: 'test-paper_clean (recyclable)',
+    }
+    const result = filterListings([specialListing], 'test-paper', 'all')
+    expect(result).toHaveLength(1)
+  })
 })

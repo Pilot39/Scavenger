@@ -25,7 +25,8 @@ describe('ProgressIndicator', () => {
   it('should show completed steps with check mark', () => {
     render(<ProgressIndicator steps={mockSteps} currentStep={3} />);
     const checkIcons = screen.getAllByRole('img', { hidden: true });
-    expect(checkIcons.length).toBeGreaterThan(0);
+    const svgElements = document.querySelectorAll('svg.lucide-check');
+    expect(svgElements.length).toBeGreaterThan(0);
   });
 
   it('should render connecting lines between steps', () => {

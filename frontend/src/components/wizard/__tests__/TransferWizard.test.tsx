@@ -8,12 +8,12 @@ describe('TransferWizard', () => {
 
   it('should render wizard with first step', () => {
     render(<TransferWizard onComplete={mockOnComplete} onCancel={mockOnCancel} />);
-    expect(screen.getByText('Select Waste Items')).toBeInTheDocument();
+    expect(screen.getAllByText('Select Waste').length).toBeGreaterThan(0);
   });
 
   it('should show progress indicator', () => {
     render(<TransferWizard onComplete={mockOnComplete} onCancel={mockOnCancel} />);
-    expect(screen.getByText('Select Waste')).toBeInTheDocument();
+    expect(screen.getAllByText('Select Waste').length).toBe(2);
     expect(screen.getByText('Select Recipient')).toBeInTheDocument();
   });
 

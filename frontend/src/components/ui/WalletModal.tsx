@@ -43,18 +43,23 @@ export function WalletModal({ open, onOpenChange }: WalletModalProps) {
             <Dialog.Close asChild>
               <button
                 className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-label="Close"
+                aria-label="Close wallet dialog"
               >
-                <X size={18} />
+                <X size={18} aria-hidden="true" />
               </button>
             </Dialog.Close>
           </div>
+          <Dialog.Description className="sr-only">
+            {isConnected
+              ? 'Your wallet is currently connected. You can disconnect it here.'
+              : 'Select a wallet to connect to the Scavngr platform.'}
+          </Dialog.Description>
 
           {isConnected ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">Connected as</p>
               <p className="font-mono text-sm bg-muted rounded px-3 py-2">{address}</p>
-              <Button variant="destructive" className="w-full" onClick={() => { disconnect(); onOpenChange(false); }}>
+              <Button variant="destructive" className="w-full" autoFocus onClick={() => { disconnect(); onOpenChange(false); }}>
                 Disconnect
               </Button>
             </div>

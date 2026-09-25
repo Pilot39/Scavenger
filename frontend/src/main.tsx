@@ -9,19 +9,16 @@ import { AuthProvider } from '@/context/AuthContext'
 import { WalletProvider } from '@/context/WalletContext'
 import { ContractProvider } from '@/context/ContractContext'
 import { ThemeProvider, useTheme } from '@/context/ThemeProvider'
+import { StoreProvider } from '@/store'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { getErrorMessage } from '@/lib/contractErrors'
 import { initWebVitals } from '@/lib/webVitals'
-import { getDB, setQueryData, getQueryData, removeQueryData } from '@/lib/indexedDB'
+import { getDB, setQueryData } from '@/lib/indexedDB'
+import '@/i18n/config'
 import './index.css'
 
 // Initialize Web Vitals monitoring
 initWebVitals((metric) => {
-  // Log to console in development
-  if (import.meta.env.DEV) {
-    console.debug(`[Web Vital] ${metric.name}: ${metric.value.toFixed(0)}ms (${metric.rating})`)
-  }
-  
   // Optionally send to analytics endpoint in production
   if (!import.meta.env.DEV) {
     try {
@@ -60,7 +57,7 @@ persistQueryClient({
   queryClient,
   persister: {
     persistClient: async (client) => {
-      const db = await getDB()
+      const _db = await getDB()
       const queries = client.getQueryCache().getAll()
       
       for (const query of queries) {
@@ -74,11 +71,11 @@ persistQueryClient({
       }
     },
     restoreClient: async () => {
-      const db = await getDB()
-      const tx = db.transaction('queries', 'readonly')
+      const _db = await getDB()
+      const tx = _db.transaction('queries', 'readonly')
       const store = tx.objectStore('queries')
       
-      const queries: Record<string, any> = {}
+      const queries: Record<string, unknown> = {}
       
       for await (const cursor of store) {
         queries[cursor.key] = cursor.value
@@ -106,14 +103,24 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <ErrorBoundary>
-          <AuthProvider>
-            <WalletProvider>
+          <WalletProvider>
+            <AuthProvider>
               <ContractProvider>
                 <App />
-                <ThemedToaster />
+                <Toaster position="top-right" richColors closeButton />
               </ContractProvider>
-            </WalletProvider>
-          </AuthProvider>
+            </AuthProvider>
+          </WalletProvider>
+          <StoreProvider>
+            <AuthProvider>
+              <WalletProvider>
+                <ContractProvider>
+                  <App />
+                  <ThemedToaster />
+                </ContractProvider>
+              </WalletProvider>
+            </AuthProvider>
+          </StoreProvider>
         </ErrorBoundary>
       </ThemeProvider>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}

@@ -9,6 +9,8 @@ describe('WasteMapFilters', () => {
 
   it('renders all filter controls', () => {
     render(<WasteMapFilters filters={defaultFilters} onChange={vi.fn()} />)
+    expect(screen.getByText('Location')).toBeInTheDocument()
+    expect(screen.getByText('Radius')).toBeInTheDocument()
     expect(screen.getByText('Type')).toBeInTheDocument()
     expect(screen.getByText('Status')).toBeInTheDocument()
     expect(screen.getByText('From')).toBeInTheDocument()
@@ -30,6 +32,20 @@ describe('WasteMapFilters', () => {
     const statusSelect = screen.getAllByRole('combobox')[1]
     fireEvent.change(statusSelect, { target: { value: 'confirmed' } })
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ status: 'confirmed' }))
+  })
+
+  it('calls onChange with location search', () => {
+    const onChange = vi.fn()
+    render(<WasteMapFilters filters={defaultFilters} onChange={onChange} />)
+    fireEvent.change(screen.getByLabelText('Location'), { target: { value: '40.7128,-74.0060' } })
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ locationQuery: '40.7128,-74.0060' }))
+  })
+
+  it('calls onChange with radius search', () => {
+    const onChange = vi.fn()
+    render(<WasteMapFilters filters={defaultFilters} onChange={onChange} />)
+    fireEvent.change(screen.getByLabelText('Radius'), { target: { value: '50' } })
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ radiusKm: 50 }))
   })
 
   it('clears waste type when "All types" selected', () => {

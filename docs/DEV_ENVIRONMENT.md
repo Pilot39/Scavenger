@@ -1,5 +1,10 @@
 # Development Environment — #484
 
+> **Start with the [Developer Onboarding Guide](./DEVELOPER_ONBOARDING.md#development-environment-setup)**,
+> which is the canonical setup path for all components. This document is the
+> Docker-specific reference: service URLs, hot reload, seed data, container shells,
+> and port overrides.
+
 ## Prerequisites
 
 - Docker Desktop ≥ 24 (or Docker Engine + Compose plugin v2)
