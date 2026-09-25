@@ -38,3 +38,14 @@ tokio-test = "0.4"
 [[bin]]
 name = "scavenger-backend"
 path = "src/main.rs"
+
+[dependencies.dashmap]
+version = "5.5"
+features = ["serde"]
+
+[dependencies.lru]
+version = "0.11"
+
+[dependencies.redis]
+version = "0.24"
+features = ["tokio-comp", "connection-manager"]
