@@ -7,6 +7,7 @@
 pub mod errors;
 mod events;
 mod types;
+pub mod types_domains;
 mod validation;
 mod verification;
 mod upgrade;
@@ -519,6 +520,44 @@ impl ScavengerContract {
             Some(_) => panic!("Participant is not registered"),
             None => panic!("Participant not found"),
         }
+    }
+
+    /// Resource-cost optimization (see BENCHMARK_RESULTS.md "Storage read
+    /// caching"): same checks as `require_registered`, but returns the
+    /// fetched `Participant` so callers that also need the record (e.g. for
+    /// a role check) can reuse this single storage read instead of issuing
+    /// a second one.
+    fn require_registered_participant(env: &Env, address: &Address) -> Participant {
+        let key = (address.clone(),);
+        let participant: Option<Participant> = env.storage().instance().get(&key);
+
+        match participant {
+            Some(p) if p.is_registered => p,
+            Some(_) => panic!("Participant is not registered"),
+            None => panic!("Participant not found"),
+        }
+    }
+
+    /// Shared role-transition rule used by both `is_valid_transfer` (which
+    /// fetches its own participants) and `transfer_waste` (which reuses
+    /// participants it already fetched via `require_registered_participant`,
+    /// avoiding a redundant storage read for the same records).
+    fn role_transition_allowed(from_p: &Participant, to_p: &Participant) -> bool {
+        if !from_p.is_registered || !to_p.is_registered {
+            return false;
+        }
+
+        // Invalid if transferring to the same role
+        if from_p.role == to_p.role {
+            return false;
+        }
+
+        matches!(
+            (from_p.role, to_p.role),
+            (ParticipantRole::Recycler, ParticipantRole::Collector)
+                | (ParticipantRole::Recycler, ParticipantRole::Manufacturer)
+                | (ParticipantRole::Collector, ParticipantRole::Manufacturer)
+        )
     }
 
     /// Verify that the caller is the contract administrator
@@ -1251,21 +1290,7 @@ impl ScavengerContract {
             return false;
         };
 
-        if !from_p.is_registered || !to_p.is_registered {
-            return false;
-        }
-
-        // Invalid if transferring to the same role
-        if from_p.role == to_p.role {
-            return false;
-        }
-
-        matches!(
-            (from_p.role, to_p.role),
-            (ParticipantRole::Recycler, ParticipantRole::Collector)
-                | (ParticipantRole::Recycler, ParticipantRole::Manufacturer)
-                | (ParticipantRole::Collector, ParticipantRole::Manufacturer)
-        )
+        Self::role_transition_allowed(&from_p, &to_p)
     }
 
     /// Standalone public function to validate a transfer path for a specific waste item.
@@ -2310,8 +2335,15 @@ impl ScavengerContract {
         from.require_auth();
 
         Self::require_not_paused(&env);
-        Self::require_registered(&env, &from);
-        Self::require_registered(&env, &to);
+
+        // Resource-cost optimization (BENCHMARK_RESULTS.md "Storage read
+        // caching"): fetch each participant record once and reuse it for
+        // both the registration check and the role-transition check below,
+        // instead of the previous 4 separate storage reads (2 via
+        // `require_registered` + 2 more inside `is_valid_transfer`) for the
+        // same two records.
+        let from_participant = Self::require_registered_participant(&env, &from);
+        let to_participant = Self::require_registered_participant(&env, &to);
 
         let mut material: Material =
             Self::get_waste_internal(&env, waste_id).expect("Waste not found");
@@ -2331,8 +2363,9 @@ impl ScavengerContract {
         //     panic!("Cannot transfer deactivated waste");
         // }
 
-        // Align with v2: enforce valid transfer routes
-        if !Self::is_valid_transfer(&env, from.clone(), to.clone()) {
+        // Align with v2: enforce valid transfer routes (reuses the
+        // already-fetched participant records — no extra storage reads).
+        if !Self::role_transition_allowed(&from_participant, &to_participant) {
             panic!("Invalid transfer: role combination not allowed");
         }
 
@@ -3915,11 +3948,15 @@ impl ScavengerContract {
         }
         let total_price = total_price_u128 as i128;
 
-        // Pay seller in tokens
-        let token_client = token::Client::new(&env, &token_address);
-        token_client.transfer(&buyer, &listing.seller, &total_price);
+        // ── Checks-effects-interactions (issue: reentrancy audit) ───────────
+        // All state mutations below happen BEFORE the external token
+        // transfer so that a malicious/misbehaving token contract cannot
+        // reenter this function (or any other) and observe or exploit a
+        // half-updated listing/stats state. Previously the token transfer
+        // was issued first, which would have let a reentrant callee see
+        // `listing.is_active == true` and purchase the same listing twice.
 
-        // Credit buyer's carbon credits
+        // Credit buyer's carbon credits (effect)
         let mut buyer_stats: RecyclingStats = env
             .storage()
             .instance()
@@ -3939,6 +3976,11 @@ impl ScavengerContract {
             .set(&("carb_list", listing_id), &listing);
 
         Self::remove_active_listing(&env, listing_id);
+
+        // Pay seller in tokens (interaction — external cross-contract call,
+        // performed last, after all state above is already committed)
+        let token_client = token::Client::new(&env, &token_address);
+        token_client.transfer(&buyer, &listing.seller, &total_price);
 
         events::emit_carbon_listing_purchased(
             &env,
@@ -5508,6 +5550,25 @@ impl ScavengerContract {
         let owner_share = (total_reward * (owner_pct as i128)) / 100;
         let mut total_distributed: i128 = 0;
 
+        // ── Checks-effects-interactions (issue: reentrancy audit) ───────────
+        // Commit the incentive-budget effect BEFORE issuing any external
+        // token transfers below. Previously `incentive.remaining_budget`
+        // was only decremented after every transfer had already been made,
+        // so a malicious token contract that reentered `distribute_reward`
+        // (or another budget-checking function) mid-loop would still see
+        // the pre-transfer budget and could drain more than `remaining_budget`
+        // allows. `total_reward` is fully computed above and does not change
+        // based on the loop below, so moving this update earlier is safe and
+        // does not alter the amounts paid out.
+        incentive.remaining_budget = incentive
+            .remaining_budget
+            .saturating_sub(total_reward as u64);
+        if incentive.remaining_budget == 0 {
+            incentive.active = false;
+        }
+        Self::set_incentive(&env, incentive_id, &incentive);
+        Self::add_to_total_tokens(&env, total_reward as u128);
+
         for transfer in transfers.iter() {
             let key = (transfer.to.clone(),);
             if let Some(p) = env.storage().instance().get::<_, Participant>(&key) {
@@ -5541,15 +5602,6 @@ impl ScavengerContract {
                 waste_id,
             );
         }
-
-        incentive.remaining_budget = incentive
-            .remaining_budget
-            .saturating_sub(total_reward as u64);
-        if incentive.remaining_budget == 0 {
-            incentive.active = false;
-        }
-        Self::set_incentive(&env, incentive_id, &incentive);
-        Self::add_to_total_tokens(&env, total_reward as u128);
 
         total_reward
     }
